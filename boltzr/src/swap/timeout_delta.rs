@@ -17,6 +17,7 @@ static BLOCK_TIMES: LazyLock<HashMap<String, f64>> = LazyLock::new(|| {
     map.insert("BTC".to_string(), 10.0);
     map.insert("LTC".to_string(), 2.5);
     map.insert("RBTC".to_string(), 0.5);
+    map.insert("cBTC".to_string(), 0.033); // Citrea Testnet: 2 second block time
     map.insert("ETH".to_string(), 0.2);
     map.insert("L-BTC".to_string(), 1.0);
     map

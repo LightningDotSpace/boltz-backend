@@ -569,7 +569,13 @@ class EthereumNursery extends TypedEventEmitter<{
 
       const wallet = this.getEthereumWallet(chainCurrency);
 
-      if (wallet) {
+      // CRITICAL FIX: Only expire swaps from this chain (same fix as Reverse Swaps)
+      if (
+        wallet &&
+        (wallet.symbol === this.ethereumManager.networkDetails.symbol ||
+          (this.ethereumManager.tokenAddresses &&
+            this.ethereumManager.tokenAddresses.has(wallet.symbol)))
+      ) {
         this.emit('swap.expired', {
           swap: expirableSwap,
           isEtherSwap:
@@ -580,8 +586,18 @@ class EthereumNursery extends TypedEventEmitter<{
   };
 
   private checkExpiredReverseSwaps = async (height: number) => {
+    this.logger.debug(
+      `[${this.ethereumManager.networkDetails.symbol}] Checking expired reverse swaps at block height: ${height}`,
+    );
+
     const expirableReverseSwaps =
       await ReverseSwapRepository.getReverseSwapsExpirable(height);
+
+    if (expirableReverseSwaps.length > 0) {
+      this.logger.warn(
+        `[${this.ethereumManager.networkDetails.symbol}] Found ${expirableReverseSwaps.length} expirable reverse swaps at height ${height}: ${expirableReverseSwaps.map((s) => `${s.id} (timeout: ${s.timeoutBlockHeight})`).join(', ')}`,
+      );
+    }
 
     for (const expirableReverseSwap of expirableReverseSwaps) {
       const { base, quote } = splitPairId(expirableReverseSwap.pair);
@@ -594,7 +610,18 @@ class EthereumNursery extends TypedEventEmitter<{
 
       const wallet = this.getEthereumWallet(chainCurrency);
 
-      if (wallet) {
+      // CRITICAL FIX: Only process swaps that belong to THIS nursery's chain
+      // Check if the wallet's symbol matches this nursery's network symbol or is a token on this chain
+      if (
+        wallet &&
+        (wallet.symbol === this.ethereumManager.networkDetails.symbol ||
+          (this.ethereumManager.tokenAddresses &&
+            this.ethereumManager.tokenAddresses.has(wallet.symbol)))
+      ) {
+        this.logger.info(
+          `[${this.ethereumManager.networkDetails.symbol}] Expiring reverse swap ${expirableReverseSwap.id} with chain currency ${chainCurrency}`,
+        );
+
         this.emit('reverseSwap.expired', {
           reverseSwap: expirableReverseSwap,
           isEtherSwap:

@@ -232,6 +232,7 @@ type ConfigType = {
   liquid?: BaseCurrencyConfig<LiquidChainConfig>;
 
   rsk?: RskConfig;
+  citrea?: RskConfig;
   ethereum: EthereumConfig;
 
   sidecar: SidecarConfig;

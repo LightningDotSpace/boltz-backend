@@ -24,6 +24,20 @@ class Api {
     this.app = express();
     this.app.set('trust proxy', true);
 
+    // CORS middleware
+    this.app.use((req: Request, res: Response, next: NextFunction) => {
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, referral');
+
+      if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+        return;
+      }
+
+      next();
+    });
+
     this.app.use(
       express.json({
         verify(req, _, buf: Buffer, encoding: string) {

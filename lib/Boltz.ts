@@ -36,7 +36,7 @@ import type { Currency } from './wallet/WalletManager';
 import WalletManager from './wallet/WalletManager';
 import EthereumManager from './wallet/ethereum/EthereumManager';
 import type { NetworkDetails } from './wallet/ethereum/EvmNetworks';
-import { Ethereum, Rsk } from './wallet/ethereum/EvmNetworks';
+import { Citrea, Ethereum, Rsk } from './wallet/ethereum/EvmNetworks';
 
 class Boltz {
   private readonly logger: Logger;
@@ -130,15 +130,16 @@ class Boltz {
     });
 
     this.ethereumManagers = [
-      { name: Ethereum.name, isRsk: false, config: this.config.ethereum },
-      { name: Rsk.name, isRsk: true, config: this.config.rsk },
+      { network: Ethereum, config: this.config.ethereum },
+      { network: Rsk, config: this.config.rsk },
+      { network: Citrea, config: this.config.citrea },
     ]
-      .map(({ name, isRsk, config }) => {
+      .map(({ network, config }) => {
         try {
-          return new EthereumManager(this.logger, isRsk, config!);
+          return new EthereumManager(this.logger, network, config!);
         } catch (error) {
           this.logger.warn(
-            `Disabled ${name} integration because: ${formatError(error)}`,
+            `Disabled ${network.name} integration because: ${formatError(error)}`,
           );
         }
 
@@ -477,6 +478,7 @@ class Boltz {
     [
       { network: Ethereum, config: this.config.ethereum.tokens },
       { network: Rsk, config: this.config.rsk?.tokens },
+      { network: Citrea, config: this.config.citrea?.tokens },
     ]
       .map((tokens) => {
         const manager = this.ethereumManagers.find(
