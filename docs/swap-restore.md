@@ -30,7 +30,7 @@ to the Boltz Backend, but it cannot spend your funds.
 ## API
 
 Call
-[`POST /v2/swap/restore`](https://api.boltz.exchange/swagger#/Swap/post_swap_restore)
+[`POST /v2/swap/restore`](https://lightning.space/v1/swap/swagger#/Swap/post_swap_restore)
 with the xpub in the request body:
 
 ```json

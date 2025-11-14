@@ -19,7 +19,7 @@ currently do not provide support for it.
 
 Our REST APIs can be accessed at:
 
-- Mainnet: `https://api.boltz.exchange/`
+- Mainnet: `https://lightning.space/v1/swap/`
 - Mainnet via [Tor](https://www.torproject.org/):
   `http://boltzzzbnus4m7mta3cxmflnps4fp7dueu2tgurstbvrbt6xswzcocyd.onion/api/`
 

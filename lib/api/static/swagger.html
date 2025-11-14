@@ -7,27 +7,28 @@
     <title>Boltz API</title>
     <link
       rel="stylesheet"
-      href="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui.css"
+      href="swagger-ui/swagger-ui.css"
     />
   </head>
   <body style="margin: 0">
     <div id="swagger-ui"></div>
     <script
-      src="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui-bundle.js"
+      src="swagger-ui/swagger-ui-bundle.js"
       crossorigin
     ></script>
     <script
-      src="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui-standalone-preset.js"
+      src="swagger-ui/swagger-ui-standalone-preset.js"
       crossorigin
     ></script>
     <script>
       window.onload = () => {
         window.ui = SwaggerUIBundle({
-          url: '/swagger-spec.json',
+          url: 'swagger-spec.json',
           dom_id: '#swagger-ui',
           deepLinking: true,
           presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
           layout: 'StandaloneLayout',
+          validatorUrl: null,
         });
       };
     </script>

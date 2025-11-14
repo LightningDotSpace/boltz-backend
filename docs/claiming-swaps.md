@@ -162,7 +162,7 @@ of Boltz's contracts can be found
 [here](https://github.com/BoltzExchange/boltz-core/tree/v2.1.3/contracts). To
 fetch the current addresses of Boltz's swap contracts and verify the contracts,
 use
-[`GET /chain/contracts`](https://api.boltz.exchange/swagger#/Chain/get_chain_contracts).
+[`GET /chain/contracts`](https://lightning.space/v1/swap/swagger#/Chain/get_chain_contracts).
 
 ### Submarine Swaps
 
@@ -175,7 +175,7 @@ the swap fails. This function takes similar parameters as `lock`, so the values
 from the response of the swap creation should be stored. To refund before the
 time lock of the swap has expired, an EIP-712 signature can be requested from
 Boltz. Use
-[`GET /swap/submarine/{id}/refund`](https://api.boltz.exchange/swagger#/Submarine/get_swap_submarine__id__refund)
+[`GET /swap/submarine/{id}/refund`](https://lightning.space/v1/swap/swagger#/Submarine/get_swap_submarine__id__refund)
 to get this signature and use it in the `refundCooperative` function of the
 contract. Similarly to cooperative Taproot refunds, Boltz will only return such
 a signature if the swap has failed already.

@@ -13,7 +13,7 @@ with BOLT11 invoices.
 
 To make it as easy as possible for clients to fetch BOLT12 invoices for offers,
 we provide
-[this API endpoint](https://api.boltz.exchange/swagger#/Lightning/post_lightning__currency__bolt12_fetch).
+[this API endpoint](https://lightning.space/v1/swap/swagger#/Lightning/post_lightning__currency__bolt12_fetch).
 
 To verify the returned invoice belongs to the provided offer, the signing key of
 the invoice has to be checked. That signing key has to be either:
@@ -45,11 +45,11 @@ To swap from a BOLT12 offer to onchain, the client needs to:
 4. Follow the usual Reverse Swap protocol
 
 Offers for Reverse Swaps can be registered with
-[this API endpoint](https://api.boltz.exchange/swagger#/Lightning/post_lightning__currency__bolt12).
+[this API endpoint](https://lightning.space/v1/swap/swagger#/Lightning/post_lightning__currency__bolt12).
 These offers have to include the CLN node of the API endpoint in a blinded
 message path as entry point. Information about the lightning nodes of the API
 can be queried from the
-[`/nodes` endpoint](https://api.boltz.exchange/swagger#/Nodes/get_nodes). When
+[`/nodes` endpoint](https://lightning.space/v1/swap/swagger#/Nodes/get_nodes). When
 registering the offer, a webhook URL can be specified. That webhook will be
 called when an invoice request for the offer is received:
 
@@ -71,11 +71,11 @@ expected:
 
 In case webhook calls are not desired, those invoice requests can also be
 delivered [via WebSocket](api-v2#bolt12-invoice-requests). There is also a
-[`PATCH` endpoint to update the webhook URL](https://api.boltz.exchange/swagger#/Lightning/patch_lightning__currency__bolt12)
+[`PATCH` endpoint to update the webhook URL](https://lightning.space/v1/swap/swagger#/Lightning/patch_lightning__currency__bolt12)
 for an offer that is registered already.
 
 When creating invoices in response to the requests,
-[this endpoint](https://api.boltz.exchange/swagger#/Lightning/get_lightning__currency__bolt12__receiving_)
+[this endpoint](https://lightning.space/v1/swap/swagger#/Lightning/get_lightning__currency__bolt12__receiving_)
 should be called to figure out parameters the API expects to be set in the
 invoice. And the invoice should have the CLN node of the API as the entry point
 of the blinded payment path.
@@ -87,4 +87,4 @@ property set instead. The rest of the Reverse Swap flow stays the exact same.
 Magic Routing hints in those BOLT12 invoices are **_not_** signaled by including
 a fake routing hint with the channel id constant. They are shown to the payer
 when they fetch the invoice for the offer
-[in the API](https://api.boltz.exchange/swagger#/Lightning/post_lightning__currency__bolt12_fetch).
+[in the API](https://lightning.space/v1/swap/swagger#/Lightning/post_lightning__currency__bolt12_fetch).
