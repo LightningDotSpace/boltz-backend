@@ -103,7 +103,7 @@ enforce claim and refund transactions.
 
 ## Blockchain Interaction
 
-Boltz provides [endpoints](https://api.boltz.exchange/swagger#/Chain/) for
+Boltz provides [endpoints](https://lightning.space/v1/swap/swagger#/Chain/) for
 querying blockchain data and broadcasting transactions. For trust minimization,
 we advise to use self-hosted infrastructure or external services (e.g.,
 [blockstream.info](https://blockstream.info/) or

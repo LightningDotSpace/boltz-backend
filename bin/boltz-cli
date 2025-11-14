@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+require('dotenv').config();
+
 const path = require('path');
 const yargs = require('yargs');
 const { hideBin } = require('yargs/helpers');
@@ -38,7 +40,7 @@ yargs(hideBin(process.argv))
     'api.endpoint': {
       describe: 'Boltz API endpoint',
       alias: 'e',
-      default: 'https://api.boltz.exchange',
+      default: process.env.BOLTZ_API_URL,
       type: 'string',
     },
   })

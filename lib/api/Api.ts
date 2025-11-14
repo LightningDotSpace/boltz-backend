@@ -48,6 +48,18 @@ class Api {
       },
     );
 
+    // Set header entry for swagger usage
+    this.app.use(
+      (_req: Request, res: Response, next: NextFunction) => {
+        res.setHeader(
+          'Content-Security-Policy',
+          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+        );
+
+        next();
+      },
+    );
+
     this.swapInfos = new SwapInfos(this.logger, service, redis);
     this.controller = new Controller(logger, service, this.swapInfos);
 
@@ -80,6 +92,18 @@ class Api {
     this.app
       .route('/swagger-spec.json')
       .get(controller.serveFile('swagger-spec.json'));
+
+    this.app
+      .route('/swagger-ui/swagger-ui.css')
+      .get(controller.serveFile('swagger-ui/swagger-ui.css'));
+
+    this.app
+      .route('/swagger-ui/swagger-ui-bundle.js')
+      .get(controller.serveFile('swagger-ui/swagger-ui-bundle.js'));
+
+    this.app
+      .route('/swagger-ui/swagger-ui-standalone-preset.js')
+      .get(controller.serveFile('swagger-ui/swagger-ui-standalone-preset.js'));
 
     // GET requests
     this.app.route('/version').get(controller.version);

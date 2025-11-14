@@ -6,7 +6,7 @@ integrations.
 ## REST Endpoints
 
 The Swagger specifications of the latest Boltz REST API can be found
-:point_right: [here](https://api.boltz.exchange/swagger) :point_left:!
+:point_right: [here](https://lightning.space/v1/swap/swagger) :point_left:!
 
 ## Examples
 
@@ -1633,7 +1633,7 @@ prevent replay attacks.
 import axios from 'axios';
 import { createHmac } from 'crypto';
 
-const endpoint = 'https://api.boltz.exchange';
+const endpoint = 'https://lightning.space/v1/swap';
 const apiKey = '<your API key>';
 const apiSecret = '<your API secret>';
 
@@ -1667,7 +1667,7 @@ use reqwest::Client;
 use sha2::Sha256;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const ENDPOINT: &str = "https://api.boltz.exchange";
+const ENDPOINT: &str = "https://lightning.space/v1/swap";
 const API_KEY: &str = "<your API key>";
 const API_SECRET: &str = "<your API secret>";
 
@@ -1721,7 +1721,7 @@ import (
 	"time"
 )
 
-const endpoint = "https://api.boltz.exchange"
+const endpoint = "https://lightning.space/v1/swap"
 const apiKey = "<your API key>"
 const apiSecret = "<your API secret>"
 

@@ -29,10 +29,13 @@ RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg -
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-ARG VERSION
-RUN git clone https://github.com/BoltzExchange/boltz-backend.git -b ${VERSION}
 WORKDIR /boltz-backend
+COPY . .
 RUN git submodule update --init
+
+ARG NODE_ENVIRONMENT
+COPY ".env.${NODE_ENVIRONMENT}" .env 
+COPY "lib/api/static/index-${NODE_ENVIRONMENT}.html" lib/api/static/index.html 
 
 RUN npm ci
 RUN npm run compile:release
@@ -50,6 +53,7 @@ RUN apt-get update && apt-get -y upgrade && \
     apt-get -y install postgresql-client-17 postgresql-client-common && \
     apt-get clean all && rm -rf /var/lib/apt/lists/*
 
+COPY --from=builder /boltz-backend/.env /boltz-backend/.env
 COPY --from=builder /boltz-backend/bin /boltz-backend/bin
 COPY --from=builder /boltz-backend/dist /boltz-backend/dist
 COPY --from=builder /boltz-backend/node_modules /boltz-backend/node_modules
