@@ -29,7 +29,7 @@ import type Sidecar from '../sidecar/Sidecar';
 import type NodeSwitch from '../swap/NodeSwitch';
 import type { Currency } from '../wallet/WalletManager';
 import type EthereumManager from '../wallet/ethereum/EthereumManager';
-import { Ethereum, Rsk } from '../wallet/ethereum/EvmNetworks';
+import { Ethereum, Rsk, Citrea } from '../wallet/ethereum/EvmNetworks';
 import Errors from './Errors';
 import RoutingOffsets from './RoutingOffsets';
 
@@ -56,6 +56,7 @@ class TimeoutDeltaProvider {
     ['BTC', 10],
     ['LTC', 2.5],
     [Rsk.symbol, 0.5],
+    [Citrea.symbol, 0.03333333],
     [Ethereum.symbol, 0.2],
     [ElementsClient.symbol, 1],
   ]);
@@ -363,7 +364,7 @@ class TimeoutDeltaProvider {
   ) => {
     const calculateBlocks = (symbol: string, minutes: number) => {
       const minutesPerBlock = TimeoutDeltaProvider.blockTimes.get(symbol)!;
-      const blocks = minutes / minutesPerBlock;
+      const blocks = Math.round(minutes / minutesPerBlock);
 
       // Sanity checks to make sure no impossible deltas are set
       if (blocks % 1 !== 0 || blocks < 1) {

@@ -20,7 +20,6 @@ import EtherWalletProvider from '../providers/EtherWalletProvider';
 import ConsolidatedEventHandler from './ConsolidatedEventHandler';
 import EthereumTransactionTracker from './EthereumTransactionTracker';
 import type { NetworkDetails } from './EvmNetworks';
-import { Ethereum, Rsk } from './EvmNetworks';
 import InjectedProvider from './InjectedProvider';
 import SequentialSigner from './SequentialSigner';
 import Contracts from './contracts/Contracts';
@@ -45,7 +44,7 @@ class EthereumManager {
 
   constructor(
     private readonly logger: Logger,
-    isRsk: boolean,
+    networkDetails: NetworkDetails,
     private readonly config: RskConfig | EthereumConfig,
   ) {
     if (
@@ -57,7 +56,7 @@ class EthereumManager {
       throw Errors.MISSING_SWAP_CONTRACTS();
     }
 
-    this.networkDetails = isRsk ? Rsk : Ethereum;
+    this.networkDetails = networkDetails;
     this.provider = new InjectedProvider(
       this.logger,
       this.networkDetails,
