@@ -40,7 +40,7 @@ yargs(hideBin(process.argv))
     'api.endpoint': {
       describe: 'Boltz API endpoint',
       alias: 'e',
-      default: process.env.LND_API_URL,
+      default: process.env.BOLTZ_API_URL,
       type: 'string',
     },
   })

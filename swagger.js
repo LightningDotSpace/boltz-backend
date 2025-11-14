@@ -31,7 +31,7 @@ const options = {
 const specs = swaggerJsdoc(options);
 specs.servers = [
   {
-    url: `${process.env.LND_API_URL}/v2`,
+    url: `${process.env.BOLTZ_API_URL}/v2`,
     description: 'Mainnet',
   }
 ];
