@@ -8,7 +8,7 @@ import {
   Transaction,
   getAddress,
 } from 'ethers';
-import type { EthereumConfig, EvmConfig } from '../../Config';
+import type { EvmConfig } from '../../Config';
 import type Logger from '../../Logger';
 import { stringify } from '../../Utils';
 import { CurrencyType } from '../../consts/Enums';
@@ -45,7 +45,7 @@ class EthereumManager {
   constructor(
     private readonly logger: Logger,
     networkDetails: NetworkDetails,
-    private readonly config: EvmConfig | EthereumConfig,
+    private readonly config: EvmConfig,
   ) {
     if (
       config === null ||

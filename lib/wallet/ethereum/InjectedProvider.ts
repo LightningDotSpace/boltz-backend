@@ -22,7 +22,6 @@ import {
 } from 'ethers';
 import type {
   EthProviderServiceConfig,
-  EthereumConfig,
   EvmConfig,
 } from '../../Config';
 import type Logger from '../../Logger';
@@ -53,7 +52,7 @@ class InjectedProvider implements Provider {
   constructor(
     private readonly logger: Logger,
     private readonly networkDetails: NetworkDetails,
-    config: EvmConfig | EthereumConfig,
+    config: EvmConfig,
   ) {
     this.provider = this;
 
@@ -77,11 +76,11 @@ class InjectedProvider implements Provider {
 
     this.addEthProvider(
       EthProviderService.Infura,
-      (config as EthereumConfig).infura,
+      config.infura,
     );
     this.addEthProvider(
       EthProviderService.Alchemy,
-      (config as EthereumConfig).alchemy,
+      config.alchemy,
     );
 
     if (this.providers.size === 0) {

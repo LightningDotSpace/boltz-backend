@@ -127,14 +127,11 @@ type EvmConfig = {
   providerEndpoint: string;
 
   alchemy: EthProviderServiceConfig;
+  infura: EthProviderServiceConfig;
 
   contracts: ContractsConfig[];
 
   tokens: TokenConfig[];
-};
-
-type EthereumConfig = EvmConfig & {
-  infura: EthProviderServiceConfig;
 };
 
 type ApiConfig = {
@@ -233,7 +230,7 @@ type ConfigType = {
 
   rsk?: EvmConfig;
   citrea?: EvmConfig;
-  ethereum: EthereumConfig;
+  ethereum: EvmConfig;
 
   sidecar: SidecarConfig;
 
@@ -550,7 +547,6 @@ export {
   SwapConfig,
   ChainConfig,
   TokenConfig,
-  EthereumConfig,
   PostgresConfig,
   CurrencyConfig,
   ContractsConfig,

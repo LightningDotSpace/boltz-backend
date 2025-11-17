@@ -569,10 +569,7 @@ class EthereumNursery extends TypedEventEmitter<{
 
       const wallet = this.getEthereumWallet(chainCurrency);
 
-      if (wallet &&
-          (wallet.symbol === this.ethereumManager.networkDetails.symbol ||
-            (this.ethereumManager.tokenAddresses?.has(wallet.symbol)))
-      ) {
+      if (wallet) {
         this.emit('swap.expired', {
           swap: expirableSwap,
           isEtherSwap:
@@ -597,10 +594,7 @@ class EthereumNursery extends TypedEventEmitter<{
 
       const wallet = this.getEthereumWallet(chainCurrency);
 
-      if (wallet &&
-          (wallet.symbol === this.ethereumManager.networkDetails.symbol ||
-            (this.ethereumManager.tokenAddresses?.has(wallet.symbol)))
-      ) {
+      if (wallet) {
         this.emit('reverseSwap.expired', {
           reverseSwap: expirableReverseSwap,
           isEtherSwap:
@@ -651,10 +645,9 @@ class EthereumNursery extends TypedEventEmitter<{
       return;
     }
 
-    if (
-      wallet.type === CurrencyType.Ether ||
-      wallet.type === CurrencyType.ERC20
-    ) {
+    if ((wallet.symbol === this.ethereumManager.networkDetails.symbol ||
+          this.ethereumManager.tokenAddresses?.has(wallet.symbol)) &&
+        [CurrencyType.Ether, CurrencyType.ERC20].includes(wallet.type)) {
       return wallet;
     }
 
