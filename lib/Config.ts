@@ -122,19 +122,16 @@ type ContractsConfig = {
   erc20Swap: string;
 };
 
-type RskConfig = {
+type EvmConfig = {
   networkName?: string;
   providerEndpoint: string;
 
   alchemy: EthProviderServiceConfig;
+  infura: EthProviderServiceConfig;
 
   contracts: ContractsConfig[];
 
   tokens: TokenConfig[];
-};
-
-type EthereumConfig = RskConfig & {
-  infura: EthProviderServiceConfig;
 };
 
 type ApiConfig = {
@@ -231,8 +228,9 @@ type ConfigType = {
 
   liquid?: BaseCurrencyConfig<LiquidChainConfig>;
 
-  rsk?: RskConfig;
-  ethereum: EthereumConfig;
+  rsk?: EvmConfig;
+  citrea?: EvmConfig;
+  ethereum: EvmConfig;
 
   sidecar: SidecarConfig;
 
@@ -543,13 +541,12 @@ class Config {
 export default Config;
 export {
   ApiConfig,
-  RskConfig,
+  EvmConfig,
   ConfigType,
   GrpcConfig,
   SwapConfig,
   ChainConfig,
   TokenConfig,
-  EthereumConfig,
   PostgresConfig,
   CurrencyConfig,
   ContractsConfig,
