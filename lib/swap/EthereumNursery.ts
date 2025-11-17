@@ -556,17 +556,7 @@ class EthereumNursery extends TypedEventEmitter<{
   };
 
   private checkExpiredSwaps = async (height: number) => {
-    this.logger.debug(
-      `[${this.ethereumManager.networkDetails.symbol}] Checking expired swaps at block height: ${height}`,
-    );
-
     const expirableSwaps = await SwapRepository.getSwapsExpirable(height);
-
-    if (expirableSwaps.length > 0) {
-      this.logger.warn(
-        `[${this.ethereumManager.networkDetails.symbol}] Found ${expirableSwaps.length} expirable reverse swaps at height ${height}: ${expirableSwaps.map((s) => `${s.id} (timeout: ${s.timeoutBlockHeight})`).join(', ')}`,
-      );
-    }
 
     for (const expirableSwap of expirableSwaps) {
       const { base, quote } = splitPairId(expirableSwap.pair);
@@ -583,10 +573,6 @@ class EthereumNursery extends TypedEventEmitter<{
           (wallet.symbol === this.ethereumManager.networkDetails.symbol ||
             (this.ethereumManager.tokenAddresses?.has(wallet.symbol)))
       ) {
-        this.logger.info(
-          `[${this.ethereumManager.networkDetails.symbol}] Expiring swap ${expirableSwap.id} with chain currency ${chainCurrency}`,
-        );
-
         this.emit('swap.expired', {
           swap: expirableSwap,
           isEtherSwap:
@@ -597,18 +583,8 @@ class EthereumNursery extends TypedEventEmitter<{
   };
 
   private checkExpiredReverseSwaps = async (height: number) => {
-    this.logger.debug(
-      `[${this.ethereumManager.networkDetails.symbol}] Checking expired reverse swaps at block height: ${height}`,
-    );
-
     const expirableReverseSwaps =
       await ReverseSwapRepository.getReverseSwapsExpirable(height);
-
-    if (expirableReverseSwaps.length > 0) {
-      this.logger.warn(
-        `[${this.ethereumManager.networkDetails.symbol}] Found ${expirableReverseSwaps.length} expirable reverse swaps at height ${height}: ${expirableReverseSwaps.map((s) => `${s.id} (timeout: ${s.timeoutBlockHeight})`).join(', ')}`,
-      );
-    }
 
     for (const expirableReverseSwap of expirableReverseSwaps) {
       const { base, quote } = splitPairId(expirableReverseSwap.pair);
@@ -625,10 +601,6 @@ class EthereumNursery extends TypedEventEmitter<{
           (wallet.symbol === this.ethereumManager.networkDetails.symbol ||
             (this.ethereumManager.tokenAddresses?.has(wallet.symbol)))
       ) {
-        this.logger.info(
-          `[${this.ethereumManager.networkDetails.symbol}] Expiring reverse swap ${expirableReverseSwap.id} with chain currency ${chainCurrency}`,
-        );
-
         this.emit('reverseSwap.expired', {
           reverseSwap: expirableReverseSwap,
           isEtherSwap:

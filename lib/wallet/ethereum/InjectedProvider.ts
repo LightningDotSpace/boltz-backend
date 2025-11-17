@@ -23,7 +23,7 @@ import {
 import type {
   EthProviderServiceConfig,
   EthereumConfig,
-  RskConfig,
+  EvmConfig,
 } from '../../Config';
 import type Logger from '../../Logger';
 import { formatError, stringify } from '../../Utils';
@@ -53,7 +53,7 @@ class InjectedProvider implements Provider {
   constructor(
     private readonly logger: Logger,
     private readonly networkDetails: NetworkDetails,
-    config: RskConfig | EthereumConfig,
+    config: EvmConfig | EthereumConfig,
   ) {
     this.provider = this;
 
