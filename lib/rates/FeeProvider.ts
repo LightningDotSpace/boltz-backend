@@ -24,7 +24,7 @@ import type { PairConfig } from '../consts/Types';
 import type Referral from '../db/models/Referral';
 import type { ExtraFees } from '../service/Service';
 import type WalletManager from '../wallet/WalletManager';
-import { Ethereum, Rsk, Citrea } from '../wallet/ethereum/EvmNetworks';
+import { Ethereum, Rsk, Citrea, Polygon } from '../wallet/ethereum/EvmNetworks';
 import type DataAggregator from './data/DataAggregator';
 
 type TransactionSizesForVersion = {
@@ -395,7 +395,8 @@ class FeeProvider {
 
       case Ethereum.symbol:
       case Rsk.symbol:
-      case Citrea.symbol: {
+      case Citrea.symbol:
+      case Polygon.symbol: {
         const relativeFee = feeMap.get(chainCurrency)!;
         const claimCost = FeeProvider.calculateEtherGasCost(
           relativeFee,

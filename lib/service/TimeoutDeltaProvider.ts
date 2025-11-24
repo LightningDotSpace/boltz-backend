@@ -29,7 +29,7 @@ import type Sidecar from '../sidecar/Sidecar';
 import type NodeSwitch from '../swap/NodeSwitch';
 import type { Currency } from '../wallet/WalletManager';
 import type EthereumManager from '../wallet/ethereum/EthereumManager';
-import { Ethereum, Rsk, Citrea } from '../wallet/ethereum/EvmNetworks';
+import { Ethereum, Rsk, Citrea, Polygon } from '../wallet/ethereum/EvmNetworks';
 import Errors from './Errors';
 import RoutingOffsets from './RoutingOffsets';
 
@@ -55,10 +55,14 @@ class TimeoutDeltaProvider {
   public static blockTimes = new Map<string, number>([
     ['BTC', 10],
     ['LTC', 2.5],
+    [ElementsClient.symbol, 1],
     [Rsk.symbol, 0.5],
     [Citrea.symbol, 0.03333333],
+    ['USDT_CITREA', 0.03333333],
     [Ethereum.symbol, 0.2],
-    [ElementsClient.symbol, 1],
+    ['USDT_ETH', 0.2],
+    [Polygon.symbol, 0.03333333],
+    ['USDT_POLYGON', 0.03333333],
   ]);
 
   public timeoutDeltas = new Map<string, PairTimeoutBlockDeltas>();
