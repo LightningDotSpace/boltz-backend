@@ -36,7 +36,7 @@ import type { Currency } from './wallet/WalletManager';
 import WalletManager from './wallet/WalletManager';
 import EthereumManager from './wallet/ethereum/EthereumManager';
 import type { NetworkDetails } from './wallet/ethereum/EvmNetworks';
-import { Ethereum, Rsk, Citrea } from './wallet/ethereum/EvmNetworks';
+import { Ethereum, Rsk, Citrea, Polygon } from './wallet/ethereum/EvmNetworks';
 
 class Boltz {
   private readonly logger: Logger;
@@ -133,6 +133,7 @@ class Boltz {
       { network: Ethereum, config: this.config.ethereum },
       { network: Rsk, config: this.config.rsk },
       { network: Citrea, config: this.config.citrea },
+      { network: Polygon, config: this.config.polygon },
     ]
       .map(({ network, config }) => {
         try {
@@ -191,7 +192,7 @@ class Boltz {
           this.config.notification,
           notificationClient,
           [this.config.liquid].concat(this.config.currencies),
-          this.config.ethereum.tokens,
+          this.config.ethereum?.tokens ?? [],
         );
       } else {
         this.logger.warn(
@@ -476,9 +477,10 @@ class Boltz {
     });
 
     [
-      { network: Ethereum, config: this.config.ethereum.tokens },
+      { network: Ethereum, config: this.config.ethereum?.tokens },
       { network: Rsk, config: this.config.rsk?.tokens },
       { network: Citrea, config: this.config.citrea?.tokens },
+      { network: Polygon, config: this.config.polygon?.tokens },
     ]
       .map((tokens) => {
         const manager = this.ethereumManagers.find(

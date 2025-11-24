@@ -230,7 +230,8 @@ type ConfigType = {
 
   rsk?: EvmConfig;
   citrea?: EvmConfig;
-  ethereum: EvmConfig;
+  polygon?: EvmConfig;
+  ethereum?: EvmConfig;
 
   sidecar: SidecarConfig;
 
@@ -406,24 +407,6 @@ class Config {
           },
         },
       ],
-
-      ethereum: {
-        providerEndpoint: '',
-
-        infura: {
-          apiKey: '',
-          network: 'rinkeby',
-        },
-
-        alchemy: {
-          apiKey: '',
-          network: 'rinkeby',
-        },
-
-        contracts: [],
-
-        tokens: [],
-      },
 
       sidecar: {} as any,
     };

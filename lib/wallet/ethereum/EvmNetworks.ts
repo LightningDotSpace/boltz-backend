@@ -24,4 +24,10 @@ const Citrea: NetworkDetails = {
   decimals: etherDecimals,
 };
 
-export { NetworkDetails, Ethereum, Rsk, Citrea };
+const Polygon: NetworkDetails = {
+  name: 'Polygon',
+  symbol: 'POL',
+  decimals: etherDecimals,
+};
+
+export { NetworkDetails, Ethereum, Rsk, Citrea, Polygon };
