@@ -423,22 +423,31 @@ class FeeProvider {
 
       // If it is not BTC, LTC or ETH, it is an ERC20 token
       default: {
-        const networkSymbol = this.walletManager.ethereumManagers.find(
-          (manager) => manager.hasSymbol(chainCurrency),
-        )!.networkDetails.symbol;
-        const relativeFee = feeMap.get(networkSymbol)!;
-
-        // For stablecoins (e.g., USDT_ETH, USDT_CITREA), use rate of 1
-        // They are always swapped 1:1 with other USD stablecoins
+        // For stablecoins (e.g., USDT_ETH, USDT_CITREA), no miner fees
+        // They are swapped 1:1 with other USD stablecoins
         const isStablecoin = chainCurrency.startsWith('USDT') ||
           chainCurrency.startsWith('USDC') ||
           chainCurrency.startsWith('DAI');
 
-        const rate = isStablecoin
-          ? 1
-          : this.dataAggregator.latestRates.get(
-              getPairId({ base: networkSymbol, quote: chainCurrency }),
-            )!;
+        if (isStablecoin) {
+          const zeroFees = {
+            normal: 0,
+            reverse: { claim: 0, lockup: 0 },
+          };
+          this.minerFees.set(chainCurrency, {
+            [SwapVersion.Legacy]: zeroFees,
+            [SwapVersion.Taproot]: zeroFees,
+          });
+          break;
+        }
+
+        const networkSymbol = this.walletManager.ethereumManagers.find(
+          (manager) => manager.hasSymbol(chainCurrency),
+        )!.networkDetails.symbol;
+        const relativeFee = feeMap.get(networkSymbol)!;
+        const rate = this.dataAggregator.latestRates.get(
+          getPairId({ base: networkSymbol, quote: chainCurrency }),
+        )!;
 
         const claimCost = FeeProvider.calculateTokenGasCosts(
           rate,
