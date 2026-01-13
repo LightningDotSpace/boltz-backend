@@ -423,51 +423,19 @@ class FeeProvider {
         break;
       }
 
-      // If it is not BTC, LTC or ETH, it is an ERC20 token
+      // ERC20 tokens: no miner fees (1:1 stablecoin swaps)
       default: {
-        const networkSymbol = this.walletManager.ethereumManagers.find(
-          (manager) => manager.hasSymbol(chainCurrency),
-        )!.networkDetails.symbol;
-        const relativeFee = feeMap.get(networkSymbol)!;
-        const rate = this.dataAggregator.latestRates.get(
-          getPairId({ base: networkSymbol, quote: chainCurrency }),
-        )!;
-
-        const claimCost = FeeProvider.calculateTokenGasCosts(
-          rate,
-          relativeFee,
-          FeeProvider.gasUsage.ERC20Swap.claim,
-        );
-
-        const fees = {
-          normal: Math.ceil(claimCost / 2),
-          reverse: {
-            claim: claimCost,
-            lockup: FeeProvider.calculateTokenGasCosts(
-              rate,
-              relativeFee,
-              FeeProvider.gasUsage.ERC20Swap.lockup,
-            ),
-          },
+        const zeroFees = {
+          normal: 0,
+          reverse: { claim: 0, lockup: 0 },
         };
-
         this.minerFees.set(chainCurrency, {
-          [SwapVersion.Legacy]: fees,
-          [SwapVersion.Taproot]: fees,
+          [SwapVersion.Legacy]: zeroFees,
+          [SwapVersion.Taproot]: zeroFees,
         });
         break;
       }
     }
-  };
-
-  private static calculateTokenGasCosts = (
-    rate: number,
-    gasPrice: number,
-    gasUsage: number,
-  ) => {
-    return Math.ceil(
-      rate * FeeProvider.calculateEtherGasCost(gasPrice, gasUsage),
-    );
   };
 
   private static calculateEtherGasCost = (
