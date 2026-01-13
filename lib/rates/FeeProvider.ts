@@ -427,9 +427,18 @@ class FeeProvider {
           (manager) => manager.hasSymbol(chainCurrency),
         )!.networkDetails.symbol;
         const relativeFee = feeMap.get(networkSymbol)!;
-        const rate = this.dataAggregator.latestRates.get(
-          getPairId({ base: networkSymbol, quote: chainCurrency }),
-        )!;
+
+        // For stablecoins (e.g., USDT_ETH, USDT_CITREA), use rate of 1
+        // They are always swapped 1:1 with other USD stablecoins
+        const isStablecoin = chainCurrency.startsWith('USDT') ||
+          chainCurrency.startsWith('USDC') ||
+          chainCurrency.startsWith('DAI');
+
+        const rate = isStablecoin
+          ? 1
+          : this.dataAggregator.latestRates.get(
+              getPairId({ base: networkSymbol, quote: chainCurrency }),
+            )!;
 
         const claimCost = FeeProvider.calculateTokenGasCosts(
           rate,
