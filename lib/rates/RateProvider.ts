@@ -69,8 +69,6 @@ class RateProvider {
   ) {
     this.feeProvider = new FeeProvider(
       this.logger,
-      walletManager,
-      this.dataAggregator,
       getFeeEstimation,
     );
     this.parseCurrencies(Array.from(currencies.values()));
