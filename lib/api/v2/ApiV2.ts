@@ -5,6 +5,7 @@ import type SwapInfos from '../SwapInfos';
 import { apiPrefix } from './Consts';
 import ChainRouter from './routers/ChainRouter';
 import InfoRouter from './routers/InfoRouter';
+import LiquidityRouter from './routers/LiquidityRouter';
 import NodesRouter from './routers/NodesRouter';
 import ReferralRouter from './routers/ReferralRouter';
 import type RouterBase from './routers/RouterBase';
@@ -24,6 +25,7 @@ class ApiV2 {
       new ChainRouter(this.logger, service),
       new NodesRouter(this.logger, service),
       new ReferralRouter(this.logger),
+      new LiquidityRouter(this.logger, service),
     ];
   }
 
