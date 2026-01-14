@@ -23,9 +23,7 @@ import {
 import type { PairConfig } from '../consts/Types';
 import type Referral from '../db/models/Referral';
 import type { ExtraFees } from '../service/Service';
-import type WalletManager from '../wallet/WalletManager';
 import { Ethereum, Rsk, Citrea, Polygon } from '../wallet/ethereum/EvmNetworks';
-import type DataAggregator from './data/DataAggregator';
 
 type TransactionSizesForVersion = {
   normalClaim: number;
@@ -132,8 +130,8 @@ class FeeProvider {
 
   constructor(
     private logger: Logger,
-    private walletManager: WalletManager,
-    private dataAggregator: DataAggregator,
+    //private walletManager: WalletManager,
+    //private dataAggregator: DataAggregator,
     private getFeeEstimation: (symbol: string) => Promise<Map<string, number>>,
   ) {}
 
