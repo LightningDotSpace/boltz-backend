@@ -72,7 +72,7 @@
     "@opentelemetry/instrumentation-http": "^0.206.0",
     "@opentelemetry/instrumentation-pg": "^0.59.0",
     "@opentelemetry/instrumentation-winston": "^0.51.0",
-    "@opentelemetry/sdk-logs": "^0.211.0",
+    "@opentelemetry/sdk-logs": "^0.206.0",
     "@opentelemetry/sdk-node": "^0.206.0",
     "@pyroscope/nodejs": "^0.4.5",
     "@vulpemventures/secp256k1-zkp": "^3.2.1",
