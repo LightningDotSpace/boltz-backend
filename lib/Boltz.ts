@@ -29,6 +29,7 @@ import ClnClient from './lightning/cln/ClnClient';
 import EmailNotifier from './notifications/EmailNotifier';
 import NotificationClient from './notifications/NotificationClient';
 import NotificationProvider from './notifications/NotificationProvider';
+import BalanceSnapshotService from './service/BalanceSnapshotService';
 import Service from './service/Service';
 import Sidecar from './sidecar/Sidecar';
 import NodeSwitch from './swap/NodeSwitch';
@@ -184,6 +185,11 @@ class Boltz {
       );
 
       if (notificationClient !== undefined) {
+        const balanceSnapshotService = new BalanceSnapshotService(
+          this.logger,
+          this.service,
+        );
+
         this.notifications = new NotificationProvider(
           this.logger,
           this.sidecar,
@@ -198,6 +204,7 @@ class Boltz {
             ...(this.config.citrea?.tokens ?? []),
             ...(this.config.polygon?.tokens ?? []),
           ],
+          balanceSnapshotService,
         );
       } else {
         this.logger.warn(

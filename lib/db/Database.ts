@@ -4,6 +4,7 @@ import type { PostgresConfig } from '../Config';
 import type Logger from '../Logger';
 import type { Currency } from '../wallet/WalletManager';
 import Migration from './Migration';
+import BalanceSnapshot from './models/BalanceSnapshot';
 import ChainSwap from './models/ChainSwap';
 import ChainSwapData from './models/ChainSwapData';
 import ChainTip from './models/ChainTip';
@@ -156,6 +157,7 @@ class Database {
     PendingEthereumTransaction.load(Database.sequelize);
     Rebroadcast.load(Database.sequelize);
     RefundTransaction.load(Database.sequelize);
+    BalanceSnapshot.load(Database.sequelize);
 
     TransactionLabelRepository.setLogger(this.logger);
   };
