@@ -187,7 +187,8 @@ class Boltz {
       if (notificationClient !== undefined) {
         const balanceSnapshotService = new BalanceSnapshotService(
           this.logger,
-          this.service,
+          this.walletManager,
+          this.currencies,
         );
 
         this.notifications = new NotificationProvider(

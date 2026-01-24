@@ -295,7 +295,7 @@ class NotificationProvider {
         // Capture balance snapshot after successful swap
         if (this.balanceSnapshotService) {
           this.balanceSnapshotService
-            .captureSnapshot(swap.id, swap.type)
+            .captureSnapshot(swap.id, swap.type, swap.pair)
             .catch((err) =>
               this.logger.warn(`Failed to capture balance snapshot: ${err}`),
             );

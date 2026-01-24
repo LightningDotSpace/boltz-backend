@@ -6,12 +6,15 @@ import type {
   WalletBalanceEntry,
 } from '../db/models/BalanceSnapshot';
 import BalanceSnapshotRepository from '../db/repositories/BalanceSnapshotRepository';
-import type Service from './Service';
+import { splitPairId } from '../Utils';
+import type { Currency } from '../wallet/WalletManager';
+import type WalletManager from '../wallet/WalletManager';
 
 class BalanceSnapshotService {
   constructor(
     private readonly logger: Logger,
-    private readonly service: Service,
+    private readonly walletManager: WalletManager,
+    private readonly currencies: Map<string, Currency>,
   ) {
     this.logger.info('Initialized BalanceSnapshotService');
   }
@@ -19,36 +22,59 @@ class BalanceSnapshotService {
   public captureSnapshot = async (
     swapId: string,
     swapType: SwapType,
+    pair: string,
   ): Promise<void> => {
     const swapTypeString = swapTypeToPrettyString(swapType);
+
     try {
-      const balanceResponse = await this.service.getBalance();
-      const balanceMap = balanceResponse.getBalancesMap();
+      const { base, quote } = splitPairId(pair);
+      const relevantSymbols = [base, quote];
 
       const wallets: WalletBalanceEntry[] = [];
       const lightning: LightningBalanceEntry[] = [];
 
-      balanceMap.forEach((balances, symbol) => {
-        // Extract wallet balances
-        balances.getWalletsMap().forEach((walletBalance, serviceName) => {
-          wallets.push({
-            symbol,
-            service: serviceName,
-            confirmed: walletBalance.getConfirmed(),
-            unconfirmed: walletBalance.getUnconfirmed(),
-          });
-        });
+      await Promise.all(
+        relevantSymbols.map(async (symbol) => {
+          const wallet = this.walletManager.wallets.get(symbol);
+          if (wallet) {
+            const balance = await wallet.getBalance();
+            wallets.push({
+              symbol,
+              service: wallet.serviceName(),
+              confirmed: balance.confirmedBalance,
+              unconfirmed: balance.unconfirmedBalance,
+            });
+          }
 
-        // Extract lightning balances
-        balances.getLightningMap().forEach((lightningBalance, serviceName) => {
-          lightning.push({
-            symbol,
-            service: serviceName,
-            local: lightningBalance.getLocal(),
-            remote: lightningBalance.getRemote(),
-          });
-        });
-      });
+          const currency = this.currencies.get(symbol);
+          if (currency) {
+            const lightningClients = [currency.lndClient, currency.clnClient].filter(
+              (client) => client !== undefined,
+            );
+
+            await Promise.all(
+              lightningClients.map(async (client) => {
+                const channelsList = await client!.listChannels();
+
+                let localBalance = 0n;
+                let remoteBalance = 0n;
+
+                channelsList.forEach((channel) => {
+                  localBalance += BigInt(channel.localBalance);
+                  remoteBalance += BigInt(channel.remoteBalance);
+                });
+
+                lightning.push({
+                  symbol,
+                  service: client!.serviceName(),
+                  local: Number(localBalance),
+                  remote: Number(remoteBalance),
+                });
+              }),
+            );
+          }
+        }),
+      );
 
       const balanceData: BalanceData = {
         wallets,
@@ -63,7 +89,7 @@ class BalanceSnapshotService {
       });
 
       this.logger.verbose(
-        `Captured balance snapshot for ${swapTypeString} swap ${swapId}`,
+        `Captured balance snapshot for ${swapTypeString} swap ${swapId} (${pair})`,
       );
     } catch (error) {
       this.logger.warn(
