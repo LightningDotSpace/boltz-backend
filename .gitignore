@@ -58,6 +58,9 @@ dist/
 .idea/
 .cursor/
 
+# OS
+.DS_Store
+
 # typedoc
 typedoc/
 
