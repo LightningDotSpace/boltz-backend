@@ -29,6 +29,7 @@ import ClnClient from './lightning/cln/ClnClient';
 import EmailNotifier from './notifications/EmailNotifier';
 import NotificationClient from './notifications/NotificationClient';
 import NotificationProvider from './notifications/NotificationProvider';
+import BalanceService from './service/BalanceService';
 import Service from './service/Service';
 import Sidecar from './sidecar/Sidecar';
 import NodeSwitch from './swap/NodeSwitch';
@@ -36,7 +37,7 @@ import type { Currency } from './wallet/WalletManager';
 import WalletManager from './wallet/WalletManager';
 import EthereumManager from './wallet/ethereum/EthereumManager';
 import type { NetworkDetails } from './wallet/ethereum/EvmNetworks';
-import { Ethereum, Rsk, Citrea, Polygon } from './wallet/ethereum/EvmNetworks';
+import { Citrea, Ethereum, Polygon, Rsk } from './wallet/ethereum/EvmNetworks';
 
 class Boltz {
   private readonly logger: Logger;
@@ -184,13 +185,10 @@ class Boltz {
       );
 
       if (notificationClient !== undefined) {
-        this.notifications = new NotificationProvider(
+        const balanceService = new BalanceService(
           this.logger,
-          this.sidecar,
-          this.service,
           this.walletManager,
-          this.config.notification,
-          notificationClient,
+          this.currencies,
           [this.config.liquid].concat(this.config.currencies),
           [
             ...(this.config.ethereum?.tokens ?? []),
@@ -198,6 +196,17 @@ class Boltz {
             ...(this.config.citrea?.tokens ?? []),
             ...(this.config.polygon?.tokens ?? []),
           ],
+          notificationClient,
+        );
+
+        this.notifications = new NotificationProvider(
+          this.logger,
+          this.sidecar,
+          this.service,
+          this.walletManager,
+          this.config.notification,
+          notificationClient,
+          balanceService,
         );
       } else {
         this.logger.warn(
