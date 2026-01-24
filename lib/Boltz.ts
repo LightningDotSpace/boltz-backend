@@ -192,7 +192,12 @@ class Boltz {
           this.config.notification,
           notificationClient,
           [this.config.liquid].concat(this.config.currencies),
-          this.config.ethereum?.tokens ?? [],
+          [
+            ...(this.config.ethereum?.tokens ?? []),
+            ...(this.config.rsk?.tokens ?? []),
+            ...(this.config.citrea?.tokens ?? []),
+            ...(this.config.polygon?.tokens ?? []),
+          ],
         );
       } else {
         this.logger.warn(
