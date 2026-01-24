@@ -109,6 +109,7 @@ class Database {
       DatabaseVersion.sync(),
       TransactionLabel.sync(),
       PendingEthereumTransaction.sync(),
+      BalanceSnapshot.sync(),
     ]);
 
     await Promise.all([Swap.sync(), ReverseSwap.sync(), ChainSwap.sync()]);
