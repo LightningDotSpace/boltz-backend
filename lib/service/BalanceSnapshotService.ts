@@ -1,5 +1,5 @@
 import type Logger from '../Logger';
-import { type SwapType, swapTypeToPrettyString } from '../consts/Enums';
+import { SwapType, swapTypeToPrettyString } from '../consts/Enums';
 import type {
   BalanceData,
   LightningBalanceEntry,
@@ -30,11 +30,17 @@ class BalanceSnapshotService {
       const { base, quote } = splitPairId(pair);
       const relevantSymbols = [base, quote];
 
+      // Only query Lightning balances for Submarine/Reverse swaps (not Chain swaps)
+      const includeLightning =
+        swapType === SwapType.Submarine ||
+        swapType === SwapType.ReverseSubmarine;
+
       const wallets: WalletBalanceEntry[] = [];
       const lightning: LightningBalanceEntry[] = [];
 
       await Promise.all(
         relevantSymbols.map(async (symbol) => {
+          // Always get wallet balance
           const wallet = this.walletManager.wallets.get(symbol);
           if (wallet) {
             const balance = await wallet.getBalance();
@@ -46,32 +52,36 @@ class BalanceSnapshotService {
             });
           }
 
-          const currency = this.currencies.get(symbol);
-          if (currency) {
-            const lightningClients = [currency.lndClient, currency.clnClient].filter(
-              (client) => client !== undefined,
-            );
+          // Only get Lightning balances for Submarine/Reverse swaps
+          if (includeLightning) {
+            const currency = this.currencies.get(symbol);
+            if (currency) {
+              const lightningClients = [
+                currency.lndClient,
+                currency.clnClient,
+              ].filter((client) => client !== undefined);
 
-            await Promise.all(
-              lightningClients.map(async (client) => {
-                const channelsList = await client!.listChannels();
+              await Promise.all(
+                lightningClients.map(async (client) => {
+                  const channelsList = await client!.listChannels();
 
-                let localBalance = 0n;
-                let remoteBalance = 0n;
+                  let localBalance = 0n;
+                  let remoteBalance = 0n;
 
-                channelsList.forEach((channel) => {
-                  localBalance += BigInt(channel.localBalance);
-                  remoteBalance += BigInt(channel.remoteBalance);
-                });
+                  channelsList.forEach((channel) => {
+                    localBalance += BigInt(channel.localBalance);
+                    remoteBalance += BigInt(channel.remoteBalance);
+                  });
 
-                lightning.push({
-                  symbol,
-                  service: client!.serviceName(),
-                  local: Number(localBalance),
-                  remote: Number(remoteBalance),
-                });
-              }),
-            );
+                  lightning.push({
+                    symbol,
+                    service: client!.serviceName(),
+                    local: Number(localBalance),
+                    remote: Number(remoteBalance),
+                  });
+                }),
+              );
+            }
           }
         }),
       );
