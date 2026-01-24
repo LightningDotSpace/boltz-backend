@@ -1,8 +1,4 @@
-import type {
-  BaseCurrencyConfig,
-  NotificationConfig,
-  TokenConfig,
-} from '../Config';
+import type { NotificationConfig } from '../Config';
 import { satoshisToSatcomma } from '../DenominationConverter';
 import type Logger from '../Logger';
 import {
@@ -28,10 +24,10 @@ import { msatToSat } from '../lightning/ChannelUtils';
 import type LndClient from '../lightning/LndClient';
 import type ClnClient from '../lightning/cln/ClnClient';
 import type { ChainInfo, LightningInfo } from '../proto/boltzrpc_pb';
+import type BalanceService from '../service/BalanceService';
 import type Service from '../service/Service';
 import type Sidecar from '../sidecar/Sidecar';
 import type WalletManager from '../wallet/WalletManager';
-import BalanceChecker from './BalanceChecker';
 import CommandHandler from './CommandHandler';
 import { Emojis } from './Markup';
 import type NotificationClient from './NotificationClient';
@@ -41,8 +37,6 @@ import type NotificationClient from './NotificationClient';
 class NotificationProvider {
   // This is a hack to add trailing whitespace which is trimmed by default
   private static trailingWhitespace = '\n** **';
-
-  private readonly balanceChecker: BalanceChecker;
 
   private timer!: any;
   private disconnected = new Set<string>();
@@ -54,21 +48,12 @@ class NotificationProvider {
     private readonly walletManager: WalletManager,
     private readonly config: NotificationConfig,
     private readonly client: NotificationClient,
-    currencies: (BaseCurrencyConfig | undefined)[],
-    tokenConfigs: TokenConfig[],
+    private readonly balanceService: BalanceService,
   ) {
     this.listenToClient();
     this.listenToService();
 
     new CommandHandler(this.logger, this.client, this.service);
-
-    this.balanceChecker = new BalanceChecker(
-      this.logger,
-      this.service,
-      this.client,
-      currencies,
-      tokenConfigs,
-    );
   }
 
   public init = async (): Promise<void> => {
@@ -126,7 +111,7 @@ class NotificationProvider {
       const check = async () => {
         await Promise.all([
           this.checkConnections(),
-          this.balanceChecker.check(),
+          this.balanceService.capturePeriodicSnapshot(),
         ]);
       };
 
@@ -289,6 +274,13 @@ class NotificationProvider {
         await this.client.sendMessage(
           `${message}${NotificationProvider.trailingWhitespace}`,
         );
+
+        // Capture balance snapshot after successful swap
+        this.balanceService
+          .captureSwapSnapshot(swap.id, swap.type, swap.pair)
+          .catch((err) =>
+            this.logger.warn(`Failed to capture balance snapshot: ${err}`),
+          );
       },
     );
 

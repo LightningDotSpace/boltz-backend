@@ -130,7 +130,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 21;
+  private static latestSchemaVersion = 22;
 
   private toBackFill: number[] = [];
 
@@ -1004,6 +1004,61 @@ class Migration {
             type: new DataTypes.BOOLEAN(),
             allowNull: false,
             defaultValue: false,
+          });
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      case 21: {
+        this.logger.info('Creating balanceSnapshots table');
+
+        await this.sequelize
+          .getQueryInterface()
+          .createTable('balanceSnapshots', {
+            id: {
+              type: DataTypes.BIGINT,
+              primaryKey: true,
+              autoIncrement: true,
+            },
+            snapshotType: {
+              type: DataTypes.STRING(20),
+              allowNull: false,
+            },
+            swapId: {
+              type: DataTypes.STRING(255),
+              allowNull: true,
+            },
+            swapType: {
+              type: DataTypes.STRING(20),
+              allowNull: true,
+            },
+            timestamp: {
+              type: DataTypes.DATE,
+              allowNull: false,
+            },
+            balances: {
+              type: DataTypes.JSONB,
+              allowNull: false,
+            },
+          });
+
+        await this.sequelize
+          .getQueryInterface()
+          .addIndex('balanceSnapshots', ['swapId'], {
+            name: 'balanceSnapshots_swapId',
+          });
+
+        await this.sequelize
+          .getQueryInterface()
+          .addIndex('balanceSnapshots', ['snapshotType'], {
+            name: 'balanceSnapshots_snapshotType',
+          });
+
+        await this.sequelize
+          .getQueryInterface()
+          .addIndex('balanceSnapshots', ['timestamp'], {
+            name: 'balanceSnapshots_timestamp',
           });
 
         await this.finishMigration(versionRow.version, currencies);
