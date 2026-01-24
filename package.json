@@ -62,15 +62,18 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@azure/monitor-opentelemetry-exporter": "^1.0.0-beta.32",
     "@grpc/grpc-js": "^1.14.0",
     "@iarna/toml": "^2.2.5",
     "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.211.0",
     "@opentelemetry/exporter-trace-otlp-grpc": "^0.206.0",
     "@opentelemetry/instrumentation-express": "^0.55.0",
     "@opentelemetry/instrumentation-grpc": "^0.206.0",
     "@opentelemetry/instrumentation-http": "^0.206.0",
     "@opentelemetry/instrumentation-pg": "^0.59.0",
     "@opentelemetry/instrumentation-winston": "^0.51.0",
+    "@opentelemetry/sdk-logs": "^0.211.0",
     "@opentelemetry/sdk-node": "^0.206.0",
     "@pyroscope/nodejs": "^0.4.5",
     "@vulpemventures/secp256k1-zkp": "^3.2.1",
