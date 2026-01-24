@@ -1,4 +1,7 @@
-import { AzureMonitorTraceExporter } from '@azure/monitor-opentelemetry-exporter';
+import {
+  AzureMonitorLogExporter,
+  AzureMonitorTraceExporter,
+} from '@azure/monitor-opentelemetry-exporter';
 import { trace } from '@opentelemetry/api';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { ExpressInstrumentation } from '@opentelemetry/instrumentation-express';
@@ -8,6 +11,7 @@ import { PgInstrumentation } from '@opentelemetry/instrumentation-pg';
 import { WinstonInstrumentation } from '@opentelemetry/instrumentation-winston';
 import { CompressionAlgorithm } from '@opentelemetry/otlp-exporter-base';
 import { resourceFromAttributes } from '@opentelemetry/resources';
+import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import type { SpanExporter } from '@opentelemetry/sdk-trace-base';
 import process from 'process';
@@ -35,6 +39,10 @@ class Tracing {
   /**
    * Initialize OpenTelemetry with Azure Monitor and/or OTLP export
    *
+   * Exports:
+   * - Traces: HTTP requests, database queries, gRPC calls
+   * - Logs: Winston log messages (correlated with traces)
+   *
    * Priority:
    * 1. Azure Monitor (if azureConnectionString provided)
    * 2. OTLP gRPC (if otlpEndpoint provided)
@@ -42,13 +50,27 @@ class Tracing {
   public init = (config: TelemetryConfig) => {
     const { network, otlpEndpoint, azureConnectionString } = config;
 
+    const resource = resourceFromAttributes({
+      ['process.pid']: process.pid,
+      ['service.version']: packageJson.version,
+      ['service.name']: `boltz-backend-${network}`,
+      ['deployment.environment']: network,
+    });
+
     let traceExporter: SpanExporter;
+    let logRecordProcessors: BatchLogRecordProcessor[] | undefined;
 
     if (azureConnectionString) {
-      // Azure Monitor exporter (sends to Application Insights)
+      // Azure Monitor exporters (sends to Application Insights)
       traceExporter = new AzureMonitorTraceExporter({
         connectionString: azureConnectionString,
       });
+
+      // Log exporter for unified logging in Azure Monitor
+      const logExporter = new AzureMonitorLogExporter({
+        connectionString: azureConnectionString,
+      });
+      logRecordProcessors = [new BatchLogRecordProcessor(logExporter)];
     } else if (otlpEndpoint) {
       // Generic OTLP gRPC exporter (for Grafana Tempo, Jaeger, etc.)
       traceExporter = new OTLPTraceExporter({
@@ -56,31 +78,20 @@ class Tracing {
         concurrencyLimit: 2_000,
         compression: CompressionAlgorithm.GZIP,
       });
+      // Note: OTLP log export not configured - use lokiEndpoint for Grafana Loki
     } else {
       // No exporter configured - traces will be captured but not exported
       return;
     }
 
     this.sdk = new NodeSDK({
+      resource,
       instrumentations,
-      resource: resourceFromAttributes({
-        ['process.pid']: process.pid,
-        ['service.version']: packageJson.version,
-        ['service.name']: `boltz-backend-${network}`,
-        ['deployment.environment']: network,
-      }),
       traceExporter,
+      logRecordProcessors,
     });
 
     this.sdk.start();
-  };
-
-  /**
-   * Legacy init method for backward compatibility
-   * @deprecated Use init(config) instead
-   */
-  public initLegacy = (endpoint: string, network: string) => {
-    this.init({ network, otlpEndpoint: endpoint });
   };
 
   public stop = async () => {
