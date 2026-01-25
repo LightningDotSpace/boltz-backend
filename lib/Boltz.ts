@@ -36,7 +36,7 @@ import type { Currency } from './wallet/WalletManager';
 import WalletManager from './wallet/WalletManager';
 import EthereumManager from './wallet/ethereum/EthereumManager';
 import type { NetworkDetails } from './wallet/ethereum/EvmNetworks';
-import { Ethereum, Rsk, Citrea, Polygon } from './wallet/ethereum/EvmNetworks';
+import { Citrea, Ethereum, Polygon, Rsk } from './wallet/ethereum/EvmNetworks';
 
 class Boltz {
   private readonly logger: Logger;
@@ -69,13 +69,20 @@ class Boltz {
       this.config.lokiEndpoint,
       this.config.network,
     );
-    if (this.config.otlpEndpoint && this.config.network) {
-      this.logger.debug('Enabling OpenTelemetry');
-      Tracing.init(this.config.otlpEndpoint, this.config.network);
+    if (this.config.azureMonitorConnectionString && this.config.network) {
+      this.logger.info('Enabling Azure Monitor telemetry');
+      Tracing.init({
+        network: this.config.network,
+        azureConnectionString: this.config.azureMonitorConnectionString,
+      });
+    } else if (this.config.otlpEndpoint && this.config.network) {
+      this.logger.debug('Enabling OpenTelemetry (OTLP)');
+      Tracing.init({
+        network: this.config.network,
+        otlpEndpoint: this.config.otlpEndpoint,
+      });
     } else {
-      this.logger.warn(
-        'Not enabling OpenTelemetry because it was not configured',
-      );
+      this.logger.warn('Not enabling telemetry because it was not configured');
     }
 
     if (this.config.profilingEndpoint && this.config.network) {
