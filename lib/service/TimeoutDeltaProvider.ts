@@ -62,7 +62,7 @@ class TimeoutDeltaProvider {
     [Ethereum.symbol, 0.2],
     ['USDT_ETH', 0.2],
     ['USDC_ETH', 0.2],
-    ['WBTC', 0.2],
+    ['WBTC_ETH', 0.2],
     [Polygon.symbol, 0.03333333],
     ['USDT_POLYGON', 0.03333333],
   ]);
