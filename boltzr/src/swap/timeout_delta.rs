@@ -20,6 +20,7 @@ static BLOCK_TIMES: LazyLock<HashMap<String, f64>> = LazyLock::new(|| {
     map.insert("RBTC".to_string(), 0.5);
     map.insert("cBTC".to_string(), 0.03333333);
     map.insert("JUSD_CITREA".to_string(), 0.03333333);
+    map.insert("WBTCe_CITREA".to_string(), 0.03333333);
     map.insert("ETH".to_string(), 0.2);
     map.insert("USDT_ETH".to_string(), 0.2);
     map.insert("USDC_ETH".to_string(), 0.2);
