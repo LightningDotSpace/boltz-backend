@@ -1,0 +1,73 @@
+name: Boltz Backend PRD CI/CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DOCKER_TAGS: dfxswiss/boltz-backend:prd
+  AZURE_RESOURCE_GROUP: rg-lds-api-prd
+  AZURE_VM_NAME: vm-lds-btc-prd
+  NODE_VERSION: 22.14.0
+  NODE_ENVIRONMENT: prd
+
+jobs:
+  build-and-deploy:
+    name: Build, test and deploy to PRD
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          file: docker/boltz/Dockerfile
+          context: .
+          push: true
+          tags: ${{ env.DOCKER_TAGS }}
+          build-args: |
+            NODE_VERSION=${{ env.NODE_VERSION }}
+            NODE_ENVIRONMENT=${{ env.NODE_ENVIRONMENT }}
+
+      # TODO: Enable when Azure credentials are configured
+      # NOTE: When enabling, add "if: always()" to "Logout from Azure" step
+      - name: Log in to Azure
+        if: false
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.LDS_PRD_CREDENTIALS }}
+
+      - name: Update Azure VM docker container
+        if: false
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            echo "Update docker container..."
+
+            az vm run-command invoke \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --name ${{ env.AZURE_VM_NAME }} \
+              --command-id RunShellScript \
+              --scripts "/home/dfx/update-boltz.sh backend"
+
+      - name: Logout from Azure
+        if: false
+        run: |
+          az logout
+        #if: always()
