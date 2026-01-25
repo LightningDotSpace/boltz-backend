@@ -59,9 +59,11 @@ class TimeoutDeltaProvider {
     [Rsk.symbol, 0.5],
     [Citrea.symbol, 0.03333333],
     ['JUSD_CITREA', 0.03333333],
+    ['WBTCe_CITREA', 0.03333333],
     [Ethereum.symbol, 0.2],
     ['USDT_ETH', 0.2],
     ['USDC_ETH', 0.2],
+    ['WBTC_ETH', 0.2],
     [Polygon.symbol, 0.03333333],
     ['USDT_POLYGON', 0.03333333],
   ]);
