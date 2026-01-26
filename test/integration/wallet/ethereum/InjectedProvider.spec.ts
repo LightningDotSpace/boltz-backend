@@ -1,5 +1,5 @@
 import { Transaction } from 'ethers';
-import type { RskConfig } from '../../../../lib/Config';
+import type { EvmConfig } from '../../../../lib/Config';
 import Logger from '../../../../lib/Logger';
 import PendingEthereumTransactionRepository from '../../../../lib/db/repositories/PendingEthereumTransactionRepository';
 import Errors from '../../../../lib/wallet/ethereum/Errors';
@@ -33,7 +33,7 @@ describe('InjectedProvider', () => {
 
   test('should throw when no provider is set', () => {
     expect(
-      () => new InjectedProvider(Logger.disabledLogger, Rsk, {} as RskConfig),
+      () => new InjectedProvider(Logger.disabledLogger, Rsk, {} as EvmConfig),
     ).toThrow(Errors.NO_PROVIDER_SPECIFIED().message);
   });
 

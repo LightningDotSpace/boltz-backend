@@ -22,8 +22,7 @@ import {
 } from 'ethers';
 import type {
   EthProviderServiceConfig,
-  EthereumConfig,
-  RskConfig,
+  EvmConfig,
 } from '../../Config';
 import type Logger from '../../Logger';
 import { formatError, stringify } from '../../Utils';
@@ -53,7 +52,7 @@ class InjectedProvider implements Provider {
   constructor(
     private readonly logger: Logger,
     private readonly networkDetails: NetworkDetails,
-    config: RskConfig | EthereumConfig,
+    config: EvmConfig,
   ) {
     this.provider = this;
 
@@ -77,11 +76,11 @@ class InjectedProvider implements Provider {
 
     this.addEthProvider(
       EthProviderService.Infura,
-      (config as EthereumConfig).infura,
+      config.infura,
     );
     this.addEthProvider(
       EthProviderService.Alchemy,
-      (config as EthereumConfig).alchemy,
+      config.alchemy,
     );
 
     if (this.providers.size === 0) {
@@ -254,19 +253,68 @@ class InjectedProvider implements Provider {
     addressOrName: string,
     blockTag?: BlockTag,
   ): Promise<number> => {
-    {
-      const highestNonce =
-        await PendingEthereumTransactionRepository.getHighestNonce();
-      if (highestNonce !== undefined) {
-        return highestNonce;
-      }
-    }
-
-    return await this.forwardMethod(
+    // Always get blockchain nonce as baseline
+    const chainNonce = await this.forwardMethod(
       'getTransactionCount',
       addressOrName,
-      blockTag,
+      blockTag ?? 'pending',
     );
+
+    const pendingTxs =
+      await PendingEthereumTransactionRepository.getTransactions();
+
+    if (pendingTxs.length === 0) {
+      return chainNonce;
+    }
+
+    // Sort by nonce ascending
+    const sorted = [...pendingTxs].sort((a, b) => a.nonce - b.nonce);
+
+    // Remove stale transactions (nonce < chainNonce means already confirmed or replaced)
+    for (const tx of sorted.filter((t) => t.nonce < chainNonce)) {
+      this.logger.info(
+        `Removing confirmed/replaced ${this.networkDetails.name} transaction: ${tx.hash} (nonce ${tx.nonce})`,
+      );
+      await tx.destroy();
+    }
+
+    // Only consider transactions with nonce >= chainNonce
+    const relevant = sorted.filter((t) => t.nonce >= chainNonce);
+
+    if (relevant.length === 0) {
+      return chainNonce;
+    }
+
+    // Check for gaps and dropped transactions
+    let nextNonce = chainNonce;
+    for (const tx of relevant) {
+      // Gap in nonce sequence found
+      if (tx.nonce !== nextNonce) {
+        this.logger.warn(
+          `Nonce gap detected: expected ${nextNonce}, found ${tx.nonce}. Filling gap.`,
+        );
+        return nextNonce;
+      }
+
+      // Check if transaction is still in mempool
+      const inMempool = await this.forwardMethodNullable(
+        'getTransaction',
+        tx.hash,
+      );
+
+      if (inMempool === null) {
+        // Transaction was dropped from mempool, reuse this nonce
+        this.logger.warn(
+          `${this.networkDetails.name} transaction ${tx.hash} dropped from mempool, reusing nonce ${tx.nonce}`,
+        );
+        await tx.destroy();
+        return tx.nonce;
+      }
+
+      nextNonce++;
+    }
+
+    return nextNonce;
   };
 
   public getTransactionReceipt = (

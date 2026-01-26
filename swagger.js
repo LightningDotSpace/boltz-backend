@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 
+require('dotenv').config();
+
 const fs = require('fs');
 const packageJson = require('./package.json');
 const swaggerJsdoc = require('swagger-jsdoc');
@@ -29,17 +31,9 @@ const options = {
 const specs = swaggerJsdoc(options);
 specs.servers = [
   {
-    url: 'https://api.boltz.exchange/v2',
+    url: `${process.env.BOLTZ_API_URL}/v2`,
     description: 'Mainnet',
-  },
-  {
-    url: 'https://api.testnet.boltz.exchange/v2',
-    description: 'Testnet',
-  },
-  {
-    url: 'http://localhost:9006/v2',
-    description: 'Regtest',
-  },
+  }
 ];
 
 fs.writeFileSync('swagger-spec.json', JSON.stringify(specs, undefined, 2));

@@ -57,7 +57,7 @@ routing hint is found, then:
 
 - Parse the public key in the routing hint.
 - Send a
-  [request to Boltz API](https://api.boltz.exchange/swagger#/Reverse/get_swap_reverse__invoice__bip21)
+  [request to Boltz API](https://lightning.space/v1/swap/swagger#/Reverse/get_swap_reverse__invoice__bip21)
   to fetch the chain address of the receiver.
 - Extract the address from the BIP21, hash the address, and verify the signature
   returned in the API call against the public key in the magic routing hint.

@@ -18,4 +18,16 @@ const Rsk: NetworkDetails = {
   decimals: etherDecimals,
 };
 
-export { NetworkDetails, Ethereum, Rsk };
+const Citrea: NetworkDetails = {
+  name: 'Citrea',
+  symbol: 'cBTC',
+  decimals: etherDecimals,
+};
+
+const Polygon: NetworkDetails = {
+  name: 'Polygon',
+  symbol: 'POL',
+  decimals: etherDecimals,
+};
+
+export { NetworkDetails, Ethereum, Rsk, Citrea, Polygon };
