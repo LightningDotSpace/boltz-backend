@@ -64,7 +64,7 @@ jobs:
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_VM_NAME }} \
               --command-id RunShellScript \
-              --scripts "/home/dfx/update-boltz.sh backend"
+              --scripts "/home/lds/update-boltz.sh backend"
 
       - name: Logout from Azure
         if: false
