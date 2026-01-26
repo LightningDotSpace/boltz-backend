@@ -130,7 +130,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 21;
+  private static latestSchemaVersion = 22;
 
   private toBackFill: number[] = [];
 
@@ -1004,6 +1004,60 @@ class Migration {
             type: new DataTypes.BOOLEAN(),
             allowNull: false,
             defaultValue: false,
+          });
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      // Schema version 22 adds balanceSnapshots table for tracking wallet balances after swaps
+      case 21: {
+        this.logUpdatingTable('balanceSnapshots');
+
+        await this.sequelize.getQueryInterface().createTable('balanceSnapshots', {
+          id: {
+            type: DataTypes.BIGINT,
+            primaryKey: true,
+            autoIncrement: true,
+          },
+          swapId: {
+            type: new DataTypes.STRING(255),
+            allowNull: false,
+          },
+          swapType: {
+            type: new DataTypes.STRING(20),
+            allowNull: false,
+          },
+          timestamp: {
+            type: DataTypes.DATE,
+            allowNull: false,
+          },
+          balances: {
+            type: DataTypes.JSONB,
+            allowNull: false,
+          },
+          createdAt: {
+            type: DataTypes.DATE,
+            allowNull: false,
+          },
+          updatedAt: {
+            type: DataTypes.DATE,
+            allowNull: false,
+          },
+        });
+
+        await this.sequelize
+          .getQueryInterface()
+          .addIndex('balanceSnapshots', ['swapId'], {
+            unique: false,
+            name: 'balanceSnapshots_swapId',
+          });
+
+        await this.sequelize
+          .getQueryInterface()
+          .addIndex('balanceSnapshots', ['timestamp'], {
+            unique: false,
+            name: 'balanceSnapshots_timestamp',
           });
 
         await this.finishMigration(versionRow.version, currencies);

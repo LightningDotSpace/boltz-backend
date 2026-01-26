@@ -28,6 +28,7 @@ import { msatToSat } from '../lightning/ChannelUtils';
 import type LndClient from '../lightning/LndClient';
 import type ClnClient from '../lightning/cln/ClnClient';
 import type { ChainInfo, LightningInfo } from '../proto/boltzrpc_pb';
+import type BalanceSnapshotService from '../service/BalanceSnapshotService';
 import type Service from '../service/Service';
 import type Sidecar from '../sidecar/Sidecar';
 import type WalletManager from '../wallet/WalletManager';
@@ -56,6 +57,7 @@ class NotificationProvider {
     private readonly client: NotificationClient,
     currencies: (BaseCurrencyConfig | undefined)[],
     tokenConfigs: TokenConfig[],
+    private readonly balanceSnapshotService?: BalanceSnapshotService,
   ) {
     this.listenToClient();
     this.listenToService();
@@ -289,6 +291,15 @@ class NotificationProvider {
         await this.client.sendMessage(
           `${message}${NotificationProvider.trailingWhitespace}`,
         );
+
+        // Capture balance snapshot after successful swap
+        if (this.balanceSnapshotService) {
+          this.balanceSnapshotService
+            .captureSnapshot(swap.id, swap.type, swap.pair)
+            .catch((err) =>
+              this.logger.warn(`Failed to capture balance snapshot: ${err}`),
+            );
+        }
       },
     );
 
