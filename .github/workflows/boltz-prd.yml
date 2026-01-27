@@ -56,11 +56,13 @@ jobs:
           inlineScript: |
             echo "Update docker container..."
 
+            CONTENT=$(base64 -w0 ./config/prd-template-boltz.conf)
+
             az vm run-command invoke \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name ${{ env.AZURE_VM_NAME }} \
               --command-id RunShellScript \
-              --scripts "/home/lds/update-boltz.sh backend"
+              --scripts "echo $CONTENT | base64 -d > /home/lds/volumes/boltz/backend/boltz.conf.template && /home/lds/update-boltz.sh backend"
 
       - name: Logout from Azure
         if: always()
