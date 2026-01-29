@@ -657,7 +657,10 @@ class EthereumNursery extends TypedEventEmitter<{
   private getEthereumWalletSymbols = () =>
     Array.from(this.walletManager.wallets.values())
       .filter(
-        (w) => w.type === CurrencyType.Ether || w.type === CurrencyType.ERC20,
+        (w) =>
+          (w.symbol === this.ethereumManager.networkDetails.symbol ||
+            this.ethereumManager.tokenAddresses?.has(w.symbol)) &&
+          [CurrencyType.Ether, CurrencyType.ERC20].includes(w.type),
       )
       .map((w) => w.symbol);
 }
