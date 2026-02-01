@@ -8,7 +8,7 @@ This is the source of the official Boltz Backend powering swaps at [boltz.exchan
 
 ## Documentation
 
-API documentation can be found [here](https://docs.boltz.exchange/v/api).
+API documentation can be found: [here](https://docs.boltz.exchange/v/api).
 
 ## Resources
 
