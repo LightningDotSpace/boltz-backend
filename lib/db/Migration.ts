@@ -17,7 +17,13 @@ import {
   getLightningCurrency,
   splitPairId,
 } from '../Utils';
-import { SwapType, SwapVersion, swapTypeToPrettyString } from '../consts/Enums';
+import {
+  FinalChainSwapEvents,
+  SwapType,
+  SwapUpdateEvent,
+  SwapVersion,
+  swapTypeToPrettyString,
+} from '../consts/Enums';
 import type { Currency } from '../wallet/WalletManager';
 import { Rsk } from '../wallet/ethereum/EvmNetworks';
 import ChainSwap from './models/ChainSwap';
@@ -130,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 21;
+  private static latestSchemaVersion = 22;
 
   private toBackFill: number[] = [];
 
@@ -1005,6 +1011,30 @@ class Migration {
             allowNull: false,
             defaultValue: false,
           });
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      // Cleanup all chain swaps that are stuck in non-terminal states
+      case 21: {
+        this.logger.info('Cleaning up all chain swaps stuck in non-terminal states');
+
+        const result = await ChainSwap.update(
+          {
+            status: SwapUpdateEvent.SwapExpired,
+            failureReason: 'cleanup: stale swap',
+          },
+          {
+            where: {
+              status: {
+                [Op.notIn]: FinalChainSwapEvents,
+              },
+            },
+          },
+        );
+
+        this.logger.info(`Cleaned up ${result[0]} stale chain swaps`);
 
         await this.finishMigration(versionRow.version, currencies);
         break;
