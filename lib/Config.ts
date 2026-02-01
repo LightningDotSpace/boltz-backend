@@ -207,9 +207,6 @@ type ConfigType = {
   otlpEndpoint?: string;
   profilingEndpoint?: string;
 
-  // Azure Application Insights connection string for unified telemetry
-  azureMonitorConnectionString?: string;
-
   prometheus?: PrometheusConfig;
 
   retryInterval: number;
