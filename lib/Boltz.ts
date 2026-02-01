@@ -254,6 +254,17 @@ class Boltz {
       await this.db.init();
       await this.redis?.connect();
 
+      // Clear swap update cache on startup to ensure consistency after crash/restart.
+      // The cache is async-updated and can become stale if the server crashes mid-operation.
+      // Clearing ensures the API fetches fresh status from the database.
+      const cacheSize = await this.api.swapInfos.cache.size();
+      if (cacheSize > 0) {
+        this.logger.info(
+          `Clearing swap update cache on startup (${cacheSize} entries)`,
+        );
+        await this.api.swapInfos.cache.clear();
+      }
+
       // To initialize the key provider before starting the sidecar
       await this.walletManager.init(this.config.currencies);
 

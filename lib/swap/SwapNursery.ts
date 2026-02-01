@@ -911,8 +911,34 @@ class SwapNursery extends TypedEventEmitter<SwapNurseryEvents> {
   };
 
   private handleChainSwapLockup = async (swap: ChainSwapInfo) => {
-    const sendingCurrency = this.currencies.get(swap.sendingData.symbol)!;
-    const wallet = this.walletManager.wallets.get(swap.sendingData.symbol)!;
+    const sendingCurrency = this.currencies.get(swap.sendingData.symbol);
+    const wallet = this.walletManager.wallets.get(swap.sendingData.symbol);
+
+    if (!sendingCurrency) {
+      this.logger.error(
+        `Currency not found for Chain Swap ${swap.id}: ${swap.sendingData.symbol}. ` +
+          `Available currencies: ${[...this.currencies.keys()].join(', ')}`,
+      );
+      await this.handleSwapSendFailed(
+        swap,
+        swap.sendingData.symbol,
+        new Error(`Currency not configured: ${swap.sendingData.symbol}`),
+      );
+      return;
+    }
+
+    if (!wallet) {
+      this.logger.error(
+        `Wallet not found for Chain Swap ${swap.id}: ${swap.sendingData.symbol}. ` +
+          `Available wallets: ${[...this.walletManager.wallets.keys()].join(', ')}`,
+      );
+      await this.handleSwapSendFailed(
+        swap,
+        swap.sendingData.symbol,
+        new Error(`Wallet not initialized: ${swap.sendingData.symbol}`),
+      );
+      return;
+    }
 
     switch (sendingCurrency.type) {
       case CurrencyType.BitcoinLike:
@@ -1208,14 +1234,26 @@ class SwapNursery extends TypedEventEmitter<SwapNurseryEvents> {
     lightningClient?: LightningClient,
   ) => {
     try {
-      const nursery = this.findEthereumNursery(wallet.symbol)!;
+      const nursery = this.findEthereumNursery(wallet.symbol);
+      if (!nursery) {
+        throw new Error(
+          `No EthereumNursery for symbol: ${wallet.symbol}. ` +
+            `Available nurseries: ${this.ethereumNurseries.map((n) => n.ethereumManager.networkDetails.symbol).join(', ')}`,
+        );
+      }
+
       const lockupDetails =
         swap.type === SwapType.ReverseSubmarine
           ? (swap as ReverseSwap)
           : (swap as ChainSwapInfo).sendingData;
-      const contracts = (await nursery.ethereumManager.contractsForAddress(
+      const contracts = await nursery.ethereumManager.contractsForAddress(
         lockupDetails.lockupAddress,
-      ))!;
+      );
+      if (!contracts) {
+        throw new Error(
+          `No contracts for lockup address: ${lockupDetails.lockupAddress}`,
+        );
+      }
 
       let contractTransaction: ContractTransactionResponse;
 
@@ -1276,16 +1314,28 @@ class SwapNursery extends TypedEventEmitter<SwapNurseryEvents> {
     lightningClient?: LightningClient,
   ) => {
     try {
-      const nursery = this.findEthereumNursery(wallet.symbol)!;
+      const nursery = this.findEthereumNursery(wallet.symbol);
+      if (!nursery) {
+        throw new Error(
+          `No EthereumNursery for symbol: ${wallet.symbol}. ` +
+            `Available nurseries: ${this.ethereumNurseries.map((n) => n.ethereumManager.networkDetails.symbol).join(', ')}`,
+        );
+      }
+
       const walletProvider = wallet.walletProvider as ERC20WalletProvider;
 
       const lockupDetails =
         swap.type === SwapType.ReverseSubmarine
           ? (swap as ReverseSwap)
           : (swap as ChainSwapInfo).sendingData;
-      const contracts = (await nursery.ethereumManager.contractsForAddress(
+      const contracts = await nursery.ethereumManager.contractsForAddress(
         lockupDetails.lockupAddress,
-      ))!;
+      );
+      if (!contracts) {
+        throw new Error(
+          `No contracts for lockup address: ${lockupDetails.lockupAddress}`,
+        );
+      }
 
       let contractTransaction: ContractTransactionResponse;
 
