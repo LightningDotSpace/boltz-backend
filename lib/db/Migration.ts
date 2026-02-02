@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 22;
+  private static latestSchemaVersion = 23;
 
   private toBackFill: number[] = [];
 
@@ -1018,7 +1018,9 @@ class Migration {
 
       // Cleanup all chain swaps that are stuck in non-terminal states
       case 21: {
-        this.logger.info('Cleaning up all chain swaps stuck in non-terminal states');
+        this.logger.info(
+          'Cleaning up all chain swaps stuck in non-terminal states',
+        );
 
         const result = await ChainSwap.update(
           {
@@ -1035,6 +1037,61 @@ class Migration {
         );
 
         this.logger.info(`Cleaned up ${result[0]} stale chain swaps`);
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      case 22: {
+        this.logger.info('Creating balanceSnapshots table');
+
+        await this.sequelize
+          .getQueryInterface()
+          .createTable('balanceSnapshots', {
+            id: {
+              type: DataTypes.BIGINT,
+              primaryKey: true,
+              autoIncrement: true,
+            },
+            snapshotType: {
+              type: DataTypes.STRING(20),
+              allowNull: false,
+            },
+            swapId: {
+              type: DataTypes.STRING(255),
+              allowNull: true,
+            },
+            swapType: {
+              type: DataTypes.STRING(20),
+              allowNull: true,
+            },
+            timestamp: {
+              type: DataTypes.DATE,
+              allowNull: false,
+            },
+            balances: {
+              type: DataTypes.JSONB,
+              allowNull: false,
+            },
+          });
+
+        await this.sequelize
+          .getQueryInterface()
+          .addIndex('balanceSnapshots', ['swapId'], {
+            name: 'balanceSnapshots_swapId',
+          });
+
+        await this.sequelize
+          .getQueryInterface()
+          .addIndex('balanceSnapshots', ['snapshotType'], {
+            name: 'balanceSnapshots_snapshotType',
+          });
+
+        await this.sequelize
+          .getQueryInterface()
+          .addIndex('balanceSnapshots', ['timestamp'], {
+            name: 'balanceSnapshots_timestamp',
+          });
 
         await this.finishMigration(versionRow.version, currencies);
         break;
