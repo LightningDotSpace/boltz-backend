@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 23;
+  private static latestSchemaVersion = 24;
 
   private toBackFill: number[] = [];
 
@@ -1092,6 +1092,62 @@ class Migration {
           .addIndex('balanceSnapshots', ['timestamp'], {
             name: 'balanceSnapshots_timestamp',
           });
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      // Mark chain swaps as completed where both sides were claimed on-chain
+      case 23: {
+        this.logger.info('Marking chain swaps as completed where both sides were claimed');
+
+        const claimedSwaps = [
+          {
+            preimageHash: '18535975363fddd3229bf3e5b2db1c69fa3776145e16f5bbe903de1b3849487b',
+            preimage: 'daf594221fc0e012d375fad4c9a9e6baa9892a291a5fd4324deabbcf34acdb42',
+          },
+          {
+            preimageHash: '97941e88d352781294a3d444440cdb5152a2209c9c2f701595dd96669c6d6fa5',
+            preimage: 'ab1d584ff7ac7d8fbe35c748c6d454bbd13cea62010f0b0eee505d563eff579b',
+          },
+          {
+            preimageHash: 'c621c41be8d89cd61ef5ca576269615e8f48c03c226a303f681e98c31a039928',
+            preimage: 'a1a31b189ee0986078afc08223e0f1d0db00f370d6083be0a6a90a3b5ff91627',
+          },
+          {
+            preimageHash: '1172f916ed12e4f0e95112a23fa943a8675860c2d939b23700dee934ebc6c854',
+            preimage: '1c541b481437415f59b6d99a80cc29a664177cdf315c07ab84c056726abd50dc',
+          },
+          {
+            preimageHash: '645232a4c7e36da2980107542b4d6e0f02205429cf189eabac30e1bdde5a3b3a',
+            preimage: 'dc3e01cc6a5fc068e183eaaf9c2c6c41c7b63116ff446b0f753d93c948301edf',
+          },
+          {
+            preimageHash: '565397362ad056882781c1799037b3f9382de27d6a80eef21d48c7b06acff093',
+            preimage: '450db698c8fef87e2263651ae041fca435fb55c7a7c2750b1b73c815d9487740',
+          },
+        ];
+
+        for (const swap of claimedSwaps) {
+          const [, updated] = await this.sequelize.query(
+            `UPDATE "chainSwaps" SET status = $1, preimage = $2, "updatedAt" = NOW() WHERE "preimageHash" = $3 AND status NOT IN ($4, $5, $6)`,
+            {
+              bind: [
+                SwapUpdateEvent.TransactionClaimed,
+                swap.preimage,
+                swap.preimageHash,
+                SwapUpdateEvent.TransactionClaimed,
+                SwapUpdateEvent.TransactionRefunded,
+                SwapUpdateEvent.SwapExpired,
+              ],
+              type: QueryTypes.UPDATE,
+            },
+          );
+
+          if (updated && updated > 0) {
+            this.logger.info(`Marked chain swap with preimageHash ${swap.preimageHash} as claimed`);
+          }
+        }
 
         await this.finishMigration(versionRow.version, currencies);
         break;
