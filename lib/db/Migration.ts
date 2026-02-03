@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 25;
+  private static latestSchemaVersion = 26;
 
   private toBackFill: number[] = [];
 
@@ -1184,6 +1184,82 @@ class Migration {
         );
 
         this.logger.info(`Updated ${updated} chain swaps to clear stale refund state`);
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      // Mark additional ERC20 chain swaps (USDT_POLYGON/JUSD_CITREA) as claimed with preimages from on-chain data
+      case 25: {
+        this.logger.info('Marking additional ERC20 chain swaps as claimed with on-chain preimages');
+
+        const claimedErc20Swaps = [
+          {
+            preimageHash: '587b1abf273e6f24e60d39175c6f1d2212015b4c8bf10dedff1731a861bba308',
+            preimage: '5d30098db3b2dd05da88dd61a0b659ca19c3acf78e6ae91339b8ae1dcc7b93c8',
+          },
+          {
+            preimageHash: '3141256e3813c347adc021ba39f8520cab1487fcfaf875c555832f8012224508',
+            preimage: '55044c8963e2c53e0634b52056ffc9a186cd6fe2ab28e305e4bce4dc3a594447',
+          },
+          {
+            preimageHash: 'dca2a29c4c0a92f75ec0e541729a07e9b42bd6b8f59fa701b00b7705307bd5c0',
+            preimage: 'ee5f23ffc148d96e15ff0c42577086d3174b5530aaa12757acd3c670b459f2db',
+          },
+          {
+            preimageHash: '20d9337778e15b821300bd3ca9181ebf3dfffae04075c5d3ae958f848e7352b1',
+            preimage: '0b3e34fc512590971e7474fe61e911ff78a64ad16938e363b4ce8e412a6c71f4',
+          },
+          {
+            preimageHash: '78c42d4d80cf7e927bde59213e5d4d32b11d6c1b2e8db14b4b3362c389fc89cf',
+            preimage: '1b710c09315ea7a3add9f2ed833df885ddf19f760ba2396012e9ccb4d29f4e64',
+          },
+          {
+            preimageHash: '1d2638396c98bd853dee25f7040faf1c21eaea3248e15056d9eba213a8bd817e',
+            preimage: '2f92d4ebddc802e390d9d65da382fa9e4836f16d42bcd7a17de63ac61616c21d',
+          },
+          {
+            preimageHash: '3b5dbff784af9278d06f420a6d19108a41f873dc87d6c0d7ede9f0024077a96c',
+            preimage: '6669afd47ae237e8f161af9b6ebd9c6f7976752b4b853a79beb24110e93bf423',
+          },
+          {
+            preimageHash: 'edcdcc6c58bec965b7331e6e6d72cc942261b2aa181176cce62a62af6c31ac40',
+            preimage: 'b0b91584cfe5398578d656e0da27ae5bb84967e4a3f802ea6b49535920184c1c',
+          },
+          {
+            preimageHash: '7b568ea84fa2d8f53f50854afc5f30b0b0a32bbf5acf90d827ca479fb6b83a28',
+            preimage: '97f72e91b7421eb10982c99ef64f8c33206a8f1ed04da4069c03e8333d27a7a4',
+          },
+          {
+            preimageHash: '425fb5a483a63cb1038ec53bddb712caa156efbde993c46378056441e089a65e',
+            preimage: '15f253c9140795169c939c524ebf5f66dea1e4b0d0f320cc584c662f602404cb',
+          },
+          {
+            preimageHash: '38eb5c88fe40052cf25223e8842de40e3a62a252067a231a888da5d4436d1676',
+            preimage: '2beff55f5823b6da1ec914572ac9d5ca31a5c6ae88febfe7a160bf90b6a8c4c6',
+          },
+        ];
+
+        for (const swap of claimedErc20Swaps) {
+          const [, updated] = await this.sequelize.query(
+            `UPDATE "chainSwaps" SET status = $1, preimage = $2, "updatedAt" = NOW() WHERE "preimageHash" = $3 AND status NOT IN ($4, $5, $6)`,
+            {
+              bind: [
+                SwapUpdateEvent.TransactionClaimed,
+                swap.preimage,
+                swap.preimageHash,
+                SwapUpdateEvent.TransactionClaimed,
+                SwapUpdateEvent.TransactionRefunded,
+                SwapUpdateEvent.SwapExpired,
+              ],
+              type: QueryTypes.UPDATE,
+            },
+          );
+
+          if (updated && updated > 0) {
+            this.logger.info(`Marked ERC20 chain swap with preimageHash ${swap.preimageHash} as claimed`);
+          }
+        }
 
         await this.finishMigration(versionRow.version, currencies);
         break;
