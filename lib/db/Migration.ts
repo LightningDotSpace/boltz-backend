@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 24;
+  private static latestSchemaVersion = 25;
 
   private toBackFill: number[] = [];
 
@@ -1148,6 +1148,42 @@ class Migration {
             this.logger.info(`Marked chain swap with preimageHash ${swap.preimageHash} as claimed`);
           }
         }
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      // Clear stale refund state for BTC/cBTC chain swaps that are already claimed
+      case 24: {
+        this.logger.info('Clearing stale refund state for already-claimed BTC chain swaps');
+
+        // These swaps are already transaction.claimed but have stale pending refund transaction IDs
+        // causing "No such mempool or blockchain transaction" errors in logs
+        const staleRefundSwapIds = [
+          'KswQeA6ZLIdx',
+          'qNCQFBJosNTD',
+          '8u7f8Unnu4Q8',
+          'z3VJ5BL5BT61',
+          'LphFCaXAbgCr',
+          'WHRLCztXfuhT',
+          'KEBsk5nTphD7',
+          'oqbhskpHTJsJ',
+          'CGI4YgxMuwvq',
+        ];
+
+        // Ensure these swaps are marked as claimed and clear any refund signature flag
+        const [, updated] = await this.sequelize.query(
+          `UPDATE "chainSwaps" SET status = $1, "createdRefundSignature" = false, "updatedAt" = NOW() WHERE id = ANY($2::text[])`,
+          {
+            bind: [
+              SwapUpdateEvent.TransactionClaimed,
+              staleRefundSwapIds,
+            ],
+            type: QueryTypes.UPDATE,
+          },
+        );
+
+        this.logger.info(`Updated ${updated} chain swaps to clear stale refund state`);
 
         await this.finishMigration(versionRow.version, currencies);
         break;
