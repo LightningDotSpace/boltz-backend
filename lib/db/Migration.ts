@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 26;
+  private static latestSchemaVersion = 27;
 
   private toBackFill: number[] = [];
 
@@ -1260,6 +1260,37 @@ class Migration {
             this.logger.info(`Marked ERC20 chain swap with preimageHash ${swap.preimageHash} as claimed`);
           }
         }
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      // Delete stale refund_transactions entries for swaps that are already claimed
+      // These cause "No such mempool or blockchain transaction" errors in RefundWatcher
+      case 26: {
+        this.logger.info('Deleting stale refund_transactions for already-claimed chain swaps');
+
+        const staleRefundSwapIds = [
+          'KswQeA6ZLIdx',
+          'qNCQFBJosNTD',
+          '8u7f8Unnu4Q8',
+          'z3VJ5BL5BT61',
+          'LphFCaXAbgCr',
+          'WHRLCztXfuhT',
+          'KEBsk5nTphD7',
+          'oqbhskpHTJsJ',
+          'CGI4YgxMuwvq',
+        ];
+
+        await this.sequelize.query(
+          `DELETE FROM refund_transactions WHERE "swapId" = ANY($1::text[])`,
+          {
+            bind: [staleRefundSwapIds],
+            type: QueryTypes.DELETE,
+          },
+        );
+
+        this.logger.info(`Deleted stale refund_transactions for ${staleRefundSwapIds.length} chain swaps`);
 
         await this.finishMigration(versionRow.version, currencies);
         break;
