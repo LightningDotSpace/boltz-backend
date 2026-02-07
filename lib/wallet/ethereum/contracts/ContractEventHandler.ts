@@ -56,6 +56,9 @@ class ContractEventHandler extends TypedEventEmitter<Events> {
   // Check for missed events every 5 minutes
   private static readonly missedEventsCheckInterval = 1_000 * 60 * 5;
 
+  // Max block range per eth_getLogs query (Citrea RPC rejects ranges >= 1000)
+  private static readonly maxBlockRangePerQuery = 999;
+
   private version!: bigint;
 
   private provider!: Provider;
@@ -111,6 +114,33 @@ class ContractEventHandler extends TypedEventEmitter<Events> {
   };
 
   public rescan = async (
+    startHeight: number,
+    endHeight?: number,
+  ): Promise<void> => {
+    const actualEndHeight =
+      endHeight ?? (await this.provider.getBlockNumber());
+    const range = actualEndHeight - startHeight;
+
+    // If range exceeds limit, split into chunks
+    if (range > ContractEventHandler.maxBlockRangePerQuery) {
+      for (
+        let from = startHeight;
+        from < actualEndHeight;
+        from += ContractEventHandler.maxBlockRangePerQuery
+      ) {
+        const to = Math.min(
+          from + ContractEventHandler.maxBlockRangePerQuery,
+          actualEndHeight,
+        );
+        await this.rescanChunk(from, to);
+      }
+      return;
+    }
+
+    await this.rescanChunk(startHeight, endHeight);
+  };
+
+  private rescanChunk = async (
     startHeight: number,
     endHeight?: number,
   ): Promise<void> => {
@@ -311,11 +341,32 @@ class ContractEventHandler extends TypedEventEmitter<Events> {
   };
 
   private checkMissedEvents = async (provider: Provider) => {
-    this.logger.debug(
-      `Checking for missed events of ${this.networkDetails.name} contracts v${this.version} from block ${this.rescanLastHeight}`,
-    );
     const currentHeight = await provider.getBlockNumber();
-    await this.rescan(this.rescanLastHeight);
+    const range = currentHeight - this.rescanLastHeight;
+
+    this.logger.debug(
+      `Checking for missed events of ${this.networkDetails.name} contracts v${this.version} from block ${this.rescanLastHeight} (${range} blocks)`,
+    );
+
+    if (range <= ContractEventHandler.maxBlockRangePerQuery) {
+      await this.rescan(this.rescanLastHeight, currentHeight);
+    } else {
+      for (
+        let from = this.rescanLastHeight;
+        from < currentHeight;
+        from += ContractEventHandler.maxBlockRangePerQuery
+      ) {
+        const to = Math.min(
+          from + ContractEventHandler.maxBlockRangePerQuery,
+          currentHeight,
+        );
+        this.logger.debug(
+          `Rescanning ${this.networkDetails.name} contracts v${this.version} chunk: blocks ${from}-${to}`,
+        );
+        await this.rescan(from, to);
+      }
+    }
+
     this.rescanLastHeight = currentHeight;
   };
 }
