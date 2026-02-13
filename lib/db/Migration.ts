@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 27;
+  private static latestSchemaVersion = 28;
 
   private toBackFill: number[] = [];
 
@@ -1291,6 +1291,43 @@ class Migration {
         );
 
         this.logger.info(`Deleted stale refund_transactions for ${staleRefundSwapIds.length} chain swaps`);
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      case 27: {
+        this.logger.info('Marking expired chain swaps as swap.expired and cleaning up stale refund transactions');
+
+        const expiredSwapIds = [
+          'wWq9UFAGAmmW',
+          'CvwGgNneNIn2',
+          'sx4XxmLkAtJJ',
+        ];
+
+        // Mark swaps as expired
+        const [, swapsUpdated] = await this.sequelize.query(
+          `UPDATE "chainSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = ANY($2::text[])`,
+          {
+            bind: [
+              SwapUpdateEvent.SwapExpired,
+              expiredSwapIds,
+            ],
+            type: QueryTypes.UPDATE,
+          },
+        );
+
+        this.logger.info(`Marked ${swapsUpdated} chain swaps as expired`);
+
+        await this.sequelize.query(
+          `DELETE FROM refund_transactions WHERE "swapId" = ANY($1::text[])`,
+          {
+            bind: [expiredSwapIds],
+            type: QueryTypes.DELETE,
+          },
+        );
+
+        this.logger.info(`Deleted stale refund_transactions for ${expiredSwapIds.length} expired swaps`);
 
         await this.finishMigration(versionRow.version, currencies);
         break;
