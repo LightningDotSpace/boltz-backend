@@ -278,7 +278,7 @@ class Config {
       swapwitnessaddress: false,
 
       swap: {
-        deferredClaimSymbols: ['L-BTC', 'cBTC'],
+        deferredClaimSymbols: ['L-BTC'],
         batchClaimInterval: '*/15 * * * *',
         expiryTolerance: 120,
         cltvDelta: 20,
