@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 28;
+  private static latestSchemaVersion = 29;
 
   private toBackFill: number[] = [];
 
@@ -1328,6 +1328,32 @@ class Migration {
         );
 
         this.logger.info(`Deleted stale refund_transactions for ${expiredSwapIds.length} expired swaps`);
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      case 28: {
+        this.logger.info('Cleaning up stale refund_transactions for already-claimed chain swaps');
+
+        const claimedSwapIds = [
+          'N4X8cwhRoQt3',
+          'fIgLJXCfVHnc',
+          'owTn3U39IG6I',
+          '9XSMtE2Fsfr5',
+          'VYFxItpgZK5m',
+          'U7edLxBHchf7',
+        ];
+
+        await this.sequelize.query(
+          `DELETE FROM refund_transactions WHERE "swapId" = ANY($1::text[])`,
+          {
+            bind: [claimedSwapIds],
+            type: QueryTypes.DELETE,
+          },
+        );
+
+        this.logger.info(`Deleted stale refund_transactions for ${claimedSwapIds.length} already-claimed swaps`);
 
         await this.finishMigration(versionRow.version, currencies);
         break;
