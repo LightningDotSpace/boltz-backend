@@ -35,6 +35,7 @@ import { LegacyReverseSwapOutputType, etherDecimals } from '../consts/Consts';
 import {
   CurrencyType,
   FinalChainSwapEvents,
+  FinalReverseSwapEvents,
   SuccessSwapUpdateEvents,
   SwapType,
   SwapUpdateEvent,
@@ -1643,10 +1644,7 @@ class SwapNursery extends TypedEventEmitter<SwapNurseryEvents> {
       id: reverseSwap.id,
     });
 
-    if (
-      queriedReverseSwap!.status === SwapUpdateEvent.SwapExpired ||
-      queriedReverseSwap!.status === SwapUpdateEvent.TransactionRefunded
-    ) {
+    if (FinalReverseSwapEvents.includes(queriedReverseSwap!.status as any)) {
       return;
     }
 
