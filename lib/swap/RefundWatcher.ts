@@ -1,7 +1,13 @@
 import AsyncLock from 'async-lock';
 import type Logger from '../Logger';
 import { formatError, getHexBuffer, reverseBuffer } from '../Utils';
-import { CurrencyType, swapTypeToPrettyString } from '../consts/Enums';
+import {
+  CurrencyType,
+  FinalChainSwapEvents,
+  FinalReverseSwapEvents,
+  SwapType,
+  swapTypeToPrettyString,
+} from '../consts/Enums';
 import TypedEventEmitter from '../consts/TypedEventEmitter';
 import type RefundTransaction from '../db/models/RefundTransaction';
 import { RefundStatus } from '../db/models/RefundTransaction';
@@ -44,6 +50,22 @@ class RefundWatcher extends TypedEventEmitter<{
       const txs = await RefundTransactionRepository.getPendingTransactions();
 
       for (const { tx, swap } of txs) {
+        const finalEvents =
+          swap.type === SwapType.Chain
+            ? FinalChainSwapEvents
+            : FinalReverseSwapEvents;
+
+        if (finalEvents.includes(swap.status as any)) {
+          this.logger.warn(
+            `Removing stale refund transaction for ${swapTypeToPrettyString(swap.type)} ${swap.id}: swap is already in final state ${swap.status}`,
+          );
+          await RefundTransactionRepository.setStatus(
+            swap.id,
+            RefundStatus.Confirmed,
+          );
+          continue;
+        }
+
         try {
           await this.checkRefund(tx, swap);
         } catch (error) {
