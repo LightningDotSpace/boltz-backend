@@ -174,6 +174,18 @@ class LndClient extends BaseClient<EventTypes> implements LightningClient {
     return true;
   };
 
+  protected scheduleReconnect(): void {
+    if (this.reconnectionTimer === undefined) {
+      this.logger.info(
+        `Scheduling reconnect to ${LndClient.serviceName} ${this.symbol} in ${this.RECONNECT_INTERVAL} ms`,
+      );
+      this.reconnectionTimer = setTimeout(
+        this.reconnect,
+        this.RECONNECT_INTERVAL,
+      );
+    }
+  }
+
   private reconnect = async () => {
     this.setClientStatus(ClientStatus.Disconnected);
 
@@ -999,6 +1011,8 @@ class LndClient extends BaseClient<EventTypes> implements LightningClient {
     if (this.isConnected()) {
       this.emit('subscription.error', subscriptionName);
       await this.reconnect();
+    } else {
+      this.scheduleReconnect();
     }
   };
 
