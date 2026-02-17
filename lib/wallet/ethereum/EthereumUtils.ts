@@ -15,13 +15,13 @@ export const getGasPrices = async (provider: Provider): Promise<Overrides> => {
   if (feeData.maxFeePerGas === null || feeData.maxFeePerGas === undefined) {
     return {
       type: 0,
-      gasPrice: feeData.gasPrice,
+      gasPrice: (feeData.gasPrice! * 125n) / 100n,
     };
   }
 
   return {
     type: 2,
-    maxFeePerGas: feeData.maxFeePerGas,
+    maxFeePerGas: (feeData.maxFeePerGas * 125n) / 100n,
     maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
   };
 };

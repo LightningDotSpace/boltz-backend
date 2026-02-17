@@ -32,11 +32,11 @@ describe('EthereumUtils', () => {
 
   test.each`
     name                          | expected                                                         | feeData
-    ${'EIP-1559'}                 | ${{ type: 2, maxFeePerGas: 2323545n, maxPriorityFeePerGas: 1n }} | ${{ maxFeePerGas: 2323545n, maxPriorityFeePerGas: 1n }}
-    ${'sanitized EIP-1559'}       | ${{ type: 2, maxFeePerGas: 2323545n, maxPriorityFeePerGas: 1n }} | ${{ maxFeePerGas: 2323545n, maxPriorityFeePerGas: 1n, some: 'shenanigans' }}
-    ${'legacy'}                   | ${{ type: 0, gasPrice: 123n }}                                   | ${{ gasPrice: 123n }}
-    ${'legacy null maxFeePerGas'} | ${{ type: 0, gasPrice: 123n }}                                   | ${{ gasPrice: 123n, maxFeePerGas: null }}
-    ${'sanitized legacy'}         | ${{ type: 0, gasPrice: 123n }}                                   | ${{ gasPrice: 123n, other: 'data', maxPriorityFeePerGas: 42n }}
+    ${'EIP-1559'}                 | ${{ type: 2, maxFeePerGas: 2904431n, maxPriorityFeePerGas: 1n }} | ${{ maxFeePerGas: 2323545n, maxPriorityFeePerGas: 1n }}
+    ${'sanitized EIP-1559'}       | ${{ type: 2, maxFeePerGas: 2904431n, maxPriorityFeePerGas: 1n }} | ${{ maxFeePerGas: 2323545n, maxPriorityFeePerGas: 1n, some: 'shenanigans' }}
+    ${'legacy'}                   | ${{ type: 0, gasPrice: 153n }}                                   | ${{ gasPrice: 123n }}
+    ${'legacy null maxFeePerGas'} | ${{ type: 0, gasPrice: 153n }}                                   | ${{ gasPrice: 123n, maxFeePerGas: null }}
+    ${'sanitized legacy'}         | ${{ type: 0, gasPrice: 153n }}                                   | ${{ gasPrice: 123n, other: 'data', maxPriorityFeePerGas: 42n }}
   `('should get $name gas prices', async ({ expected, feeData }) => {
     mockGetFeeDataResult = feeData;
     expect(await getGasPrices(provider)).toEqual(expected);
