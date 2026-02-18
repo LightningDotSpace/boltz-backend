@@ -1411,7 +1411,6 @@ class Migration {
         break;
       }
 
-      // Fixup for develop environments that ran case 29 without removeConstraint
       case 30: {
         try {
           await this.sequelize
