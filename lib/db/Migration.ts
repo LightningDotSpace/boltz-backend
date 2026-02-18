@@ -1383,6 +1383,14 @@ class Migration {
 
           await this.sequelize
             .getQueryInterface()
+            .removeConstraint(
+              PendingEthereumTransaction.tableName,
+              'pendingEthereumTransactions_nonce_key',
+              { transaction },
+            );
+
+          await this.sequelize
+            .getQueryInterface()
             .removeIndex(
               PendingEthereumTransaction.tableName,
               ['nonce'],
