@@ -19,6 +19,7 @@ class SequentialSigner extends AbstractSigner {
 
   constructor(
     private readonly symbol: string,
+    private readonly chainIdentifier: string,
     private signer: AbstractSigner,
   ) {
     super(signer.provider);
@@ -27,7 +28,11 @@ class SequentialSigner extends AbstractSigner {
   public getAddress = (): Promise<string> => this.signer.getAddress();
 
   public connect = (provider: null | Provider): Signer => {
-    return new SequentialSigner(this.symbol, this.signer.connect(provider));
+    return new SequentialSigner(
+      this.symbol,
+      this.chainIdentifier,
+      this.signer.connect(provider),
+    );
   };
 
   public signTransaction = async (tx: TransactionRequest): Promise<string> => {
@@ -70,7 +75,9 @@ class SequentialSigner extends AbstractSigner {
       if (tx.value !== undefined && tx.value !== null) {
         const [ourBalance, pendingTxsValue] = await Promise.all([
           this.signer.provider!.getBalance(await this.getAddress()),
-          PendingEthereumTransactionRepository.getTotalSent(),
+          PendingEthereumTransactionRepository.getTotalSent(
+            this.chainIdentifier,
+          ),
         ]);
 
         if (ourBalance - pendingTxsValue < BigInt(tx.value)) {

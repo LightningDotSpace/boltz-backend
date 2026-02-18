@@ -9,7 +9,7 @@ describe('SequentialSigner', () => {
 
   beforeAll(async () => {
     setup = await getSigner();
-    signer = new SequentialSigner('ETH', setup.signer);
+    signer = new SequentialSigner('ETH', 'Ethereum', setup.signer);
 
     await fundSignerWallet(setup.signer, setup.etherBase);
 

@@ -261,7 +261,9 @@ class InjectedProvider implements Provider {
     );
 
     const pendingTxs =
-      await PendingEthereumTransactionRepository.getTransactions();
+      await PendingEthereumTransactionRepository.getTransactions(
+        this.networkDetails.name,
+      );
 
     if (pendingTxs.length === 0) {
       return chainNonce;
@@ -587,6 +589,7 @@ class InjectedProvider implements Provider {
     );
     await PendingEthereumTransactionRepository.addTransaction(
       tx.hash!,
+      this.networkDetails.name,
       tx.nonce,
       tx.value,
       tx.serialized,

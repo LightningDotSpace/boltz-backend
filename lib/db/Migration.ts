@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 29;
+  private static latestSchemaVersion = 30;
 
   private toBackFill: number[] = [];
 
@@ -733,7 +733,7 @@ class Migration {
           });
 
         const txs =
-          await PendingEthereumTransactionRepository.getTransactions();
+          await PendingEthereumTransactionRepository.getAllTransactions();
         for (const tx of txs) {
           const fetchedTx = await currencies
             .get(Rsk.symbol)
@@ -1354,6 +1354,50 @@ class Migration {
         );
 
         this.logger.info(`Deleted stale refund_transactions for ${claimedSwapIds.length} already-claimed swaps`);
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      case 29: {
+        this.logger.info(
+          'Adding chainIdentifier column to pendingEthereumTransactions',
+        );
+
+        await this.sequelize.transaction(async (transaction) => {
+          // Purge any leftover rows — they have no chain context and are stale
+          await this.sequelize.query(
+            `DELETE FROM "${PendingEthereumTransaction.tableName}"`,
+            { transaction },
+          );
+
+          await this.sequelize.getQueryInterface().addColumn(
+            PendingEthereumTransaction.tableName,
+            'chainIdentifier',
+            {
+              type: new DataTypes.STRING(255),
+              allowNull: false,
+            },
+            { transaction },
+          );
+
+          await this.sequelize
+            .getQueryInterface()
+            .removeIndex(
+              PendingEthereumTransaction.tableName,
+              ['nonce'],
+              { transaction },
+            );
+
+          await this.sequelize.getQueryInterface().addIndex(
+            PendingEthereumTransaction.tableName,
+            ['chainIdentifier', 'nonce'],
+            {
+              unique: true,
+              transaction,
+            },
+          );
+        });
 
         await this.finishMigration(versionRow.version, currencies);
         break;

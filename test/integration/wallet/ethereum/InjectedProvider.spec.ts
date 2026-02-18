@@ -18,6 +18,7 @@ jest.mock(
   () => ({
     addTransaction: jest.fn().mockResolvedValue(null),
     getHighestNonce: jest.fn().mockResolvedValue(undefined),
+    getTransactions: jest.fn().mockResolvedValue([]),
   }),
 );
 
@@ -59,31 +60,48 @@ describe('InjectedProvider', () => {
   describe('getTransactionCount', () => {
     const address = '0x0000000000000000000000000000000000000000';
 
-    afterAll(() => {
-      PendingEthereumTransactionRepository.getHighestNonce = jest
-        .fn()
-        .mockResolvedValue(undefined);
+    afterEach(() => {
+      jest.clearAllMocks();
     });
 
     test('should get transaction count from provider when there are no pending transactions', async () => {
-      PendingEthereumTransactionRepository.getHighestNonce = jest
+      PendingEthereumTransactionRepository.getTransactions = jest
         .fn()
-        .mockResolvedValue(undefined);
+        .mockResolvedValue([]);
       await expect(provider.getTransactionCount(address)).resolves.toEqual(0);
+      expect(
+        PendingEthereumTransactionRepository.getTransactions,
+      ).toHaveBeenCalledWith(Ethereum.name);
     });
 
-    test('should get transaction count from db when there are pending transactions', async () => {
-      const highestNonce = 10;
-      PendingEthereumTransactionRepository.getHighestNonce = jest
+    test('should return next nonce after highest pending transaction', async () => {
+      const mockTxs = [
+        { nonce: 0, hash: '0xabc', destroy: jest.fn() },
+        { nonce: 1, hash: '0xdef', destroy: jest.fn() },
+      ];
+
+      PendingEthereumTransactionRepository.getTransactions = jest
         .fn()
-        .mockResolvedValue(highestNonce);
-      await expect(provider.getTransactionCount(address)).resolves.toEqual(
-        highestNonce,
-      );
+        .mockResolvedValue(mockTxs);
+
+      const forwardMethodNullable = jest
+        .fn()
+        .mockResolvedValue({ hash: '0xabc' });
+      provider['forwardMethodNullable'] = forwardMethodNullable;
+
+      const result = await provider.getTransactionCount(address);
+      expect(result).toEqual(2);
+      expect(
+        PendingEthereumTransactionRepository.getTransactions,
+      ).toHaveBeenCalledWith(Ethereum.name);
     });
   });
 
-  test('should save broadcast transactions to database', async () => {
+  test('should save broadcast transactions to database with chainIdentifier', async () => {
+    PendingEthereumTransactionRepository.getTransactions = jest
+      .fn()
+      .mockResolvedValue([]);
+
     const setup = await getSigner();
     await fundSignerWallet(setup.signer, setup.etherBase);
     const signer = setup.signer.connect(provider);
@@ -100,6 +118,7 @@ describe('InjectedProvider', () => {
       PendingEthereumTransactionRepository.addTransaction,
     ).toHaveBeenCalledWith(
       tx.hash,
+      Ethereum.name,
       tx.nonce,
       tx.value,
       Transaction.from(tx).serialized,
