@@ -57,11 +57,16 @@ abstract class BaseClient<
       promise,
       (reject) => {
         this.setClientStatus(ClientStatus.Disconnected);
+        this.scheduleReconnect();
         raceHandler(reject);
       },
       raceTimeout,
     );
   };
+
+  protected scheduleReconnect(): void {
+    // No-op by default; overridden by LndClient and ClnClient
+  }
 
   protected clearReconnectTimer = (): void => {
     if (this.reconnectionTimer) {
