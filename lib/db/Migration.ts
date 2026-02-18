@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 30;
+  private static latestSchemaVersion = 31;
 
   private toBackFill: number[] = [];
 
@@ -1383,6 +1383,14 @@ class Migration {
 
           await this.sequelize
             .getQueryInterface()
+            .removeConstraint(
+              PendingEthereumTransaction.tableName,
+              'pendingEthereumTransactions_nonce_key',
+              { transaction },
+            );
+
+          await this.sequelize
+            .getQueryInterface()
             .removeIndex(
               PendingEthereumTransaction.tableName,
               ['nonce'],
@@ -1398,6 +1406,27 @@ class Migration {
             },
           );
         });
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      case 30: {
+        try {
+          await this.sequelize
+            .getQueryInterface()
+            .removeConstraint(
+              PendingEthereumTransaction.tableName,
+              'pendingEthereumTransactions_nonce_key',
+            );
+          this.logger.info(
+            'Removed leftover unique constraint on nonce from pendingEthereumTransactions',
+          );
+        } catch {
+          this.logger.debug(
+            'No leftover nonce constraint to remove — already clean',
+          );
+        }
 
         await this.finishMigration(versionRow.version, currencies);
         break;
