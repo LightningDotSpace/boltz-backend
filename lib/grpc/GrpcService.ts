@@ -28,7 +28,7 @@ import * as boltzrpc from '../proto/boltzrpc_pb';
 import { LogLevel } from '../proto/boltzrpc_pb';
 import type Service from '../service/Service';
 import Sidecar from '../sidecar/Sidecar';
-import { Rsk } from '../wallet/ethereum/EvmNetworks';
+
 
 class GrpcService {
   constructor(
@@ -391,13 +391,11 @@ class GrpcService {
       const response = new boltzrpc.GetPendingEvmTransactionsResponse();
       const txsGrpcList = response.getTransactionsList();
 
-      for (const tx of await PendingEthereumTransactionRepository.getTransactions()) {
+      for (const tx of await PendingEthereumTransactionRepository.getAllTransactions()) {
         const txGrpc =
           new boltzrpc.GetPendingEvmTransactionsResponse.Transaction();
 
-        const symbol = Rsk.symbol;
-
-        txGrpc.setSymbol(symbol);
+        txGrpc.setSymbol(tx.chainIdentifier);
         txGrpc.setHash(getHexBuffer(removeHexPrefix(tx.hash)));
         txGrpc.setHex(getHexBuffer(removeHexPrefix(tx.hex)));
         txGrpc.setNonce(tx.nonce);
@@ -412,7 +410,7 @@ class GrpcService {
 
         {
           const manager = this.service.walletManager.ethereumManagers.find(
-            (m) => m.hasSymbol(symbol),
+            (m) => m.networkDetails.name === tx.chainIdentifier,
           );
           if (manager !== undefined) {
             const received = await manager.getClaimedAmount(tx.hex);

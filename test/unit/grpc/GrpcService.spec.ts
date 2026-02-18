@@ -635,10 +635,11 @@ describe('GrpcService', () => {
           hex: '0x12345678',
           nonce: 123,
           etherAmount: 21_000_000_000,
+          chainIdentifier: Rsk.symbol,
         },
       ] as PendingEthereumTransaction[];
 
-      PendingEthereumTransactionRepository.getTransactions = jest
+      PendingEthereumTransactionRepository.getAllTransactions = jest
         .fn()
         .mockResolvedValue(txs);
 
@@ -665,10 +666,10 @@ describe('GrpcService', () => {
       ]);
 
       expect(
-        PendingEthereumTransactionRepository.getTransactions,
+        PendingEthereumTransactionRepository.getAllTransactions,
       ).toHaveBeenCalledTimes(1);
       expect(
-        PendingEthereumTransactionRepository.getTransactions,
+        PendingEthereumTransactionRepository.getAllTransactions,
       ).toHaveBeenCalledWith();
     });
 
@@ -679,16 +680,17 @@ describe('GrpcService', () => {
           hex: '0x12345678',
           nonce: 123,
           etherAmount: 21_000_000_000,
+          chainIdentifier: Rsk.symbol,
         },
       ] as PendingEthereumTransaction[];
 
-      PendingEthereumTransactionRepository.getTransactions = jest
+      PendingEthereumTransactionRepository.getAllTransactions = jest
         .fn()
         .mockResolvedValue(txs);
 
       const claimedAmount = 123123123123n;
       grpcService['service'].walletManager.ethereumManagers.push({
-        hasSymbol: jest.fn().mockReturnValue(true),
+        networkDetails: { name: Rsk.symbol },
         getClaimedAmount: jest.fn().mockResolvedValue(claimedAmount),
       } as unknown as EthereumManager);
 
@@ -722,16 +724,17 @@ describe('GrpcService', () => {
           hex: '0x12345678',
           nonce: 123,
           etherAmount: 21_000_000_000,
+          chainIdentifier: Rsk.symbol,
         },
       ] as PendingEthereumTransaction[];
 
-      PendingEthereumTransactionRepository.getTransactions = jest
+      PendingEthereumTransactionRepository.getAllTransactions = jest
         .fn()
         .mockResolvedValue(txs);
 
       const claimedAmount = 123123123123n;
       grpcService['service'].walletManager.ethereumManagers.push({
-        hasSymbol: jest.fn().mockReturnValue(true),
+        networkDetails: { name: Rsk.symbol },
         getClaimedAmount: jest.fn().mockResolvedValue(claimedAmount),
       } as unknown as EthereumManager);
 

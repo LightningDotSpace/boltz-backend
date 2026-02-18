@@ -85,6 +85,7 @@ class EthereumManager {
 
     this.signer = new SequentialSigner(
       this.networkDetails.symbol,
+      this.networkDetails.name,
       EthersWallet.fromPhrase(mnemonic),
     ).connect(this.provider);
     this.address = await this.signer.getAddress();

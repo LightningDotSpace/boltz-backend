@@ -3,6 +3,7 @@ import { DataTypes, Model } from 'sequelize';
 
 type PendingEthereumTransactionType = {
   hash: string;
+  chainIdentifier: string;
   nonce: number;
   etherAmount: number;
   hex: string;
@@ -13,6 +14,7 @@ class PendingEthereumTransaction
   implements PendingEthereumTransactionType
 {
   public hash!: string;
+  public chainIdentifier!: string;
   public nonce!: number;
   public etherAmount!: number;
   public hex!: string;
@@ -25,9 +27,12 @@ class PendingEthereumTransaction
           primaryKey: true,
           allowNull: false,
         },
+        chainIdentifier: {
+          type: new DataTypes.STRING(255),
+          allowNull: false,
+        },
         nonce: {
           type: new DataTypes.INTEGER(),
-          unique: true,
           allowNull: false,
         },
         etherAmount: {
@@ -50,7 +55,7 @@ class PendingEthereumTransaction
           },
           {
             unique: true,
-            fields: ['nonce'],
+            fields: ['chainIdentifier', 'nonce'],
           },
         ],
       },

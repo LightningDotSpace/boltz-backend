@@ -64,6 +64,7 @@ describe('EthereumTransactionTracker', () => {
     await transactionTracker.scanPendingTransactions();
 
     expect(mockGetTransactions).toHaveBeenCalledTimes(1);
+    expect(mockGetTransactions).toHaveBeenCalledWith(Ethereum.name);
     expect(mockGetTransactionsResult[0].destroy).toHaveBeenCalledTimes(1);
   });
 
