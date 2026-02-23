@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 31;
+  private static latestSchemaVersion = 32;
 
   private toBackFill: number[] = [];
 
@@ -1427,6 +1427,33 @@ class Migration {
             'No leftover nonce constraint to remove — already clean',
           );
         }
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      // Mark stuck test chain swaps as failed to stop infinite refund retry loop
+      case 31: {
+        this.logger.info('Marking stuck test chain swaps as failed');
+
+        const stuckTestSwapIds = [
+          'FXbxZJE3Mw9Q',
+          'GrIXPeEYYdPQ',
+        ];
+
+        const [, updated] = await this.sequelize.query(
+          `UPDATE "chainSwaps" SET status = $1, "failureReason" = $2, "updatedAt" = NOW() WHERE id = ANY($3::text[])`,
+          {
+            bind: [
+              SwapUpdateEvent.TransactionFailed,
+              'cleanup: stuck test swap with invalid lockup transaction',
+              stuckTestSwapIds,
+            ],
+            type: QueryTypes.UPDATE,
+          },
+        );
+
+        this.logger.info(`Marked ${updated} stuck test chain swaps as failed`);
 
         await this.finishMigration(versionRow.version, currencies);
         break;
