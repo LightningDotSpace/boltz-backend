@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 32;
+  private static latestSchemaVersion = 33;
 
   private toBackFill: number[] = [];
 
@@ -1454,6 +1454,31 @@ class Migration {
         );
 
         this.logger.info(`Marked ${updated} stuck test chain swaps as failed`);
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      case 32: {
+        this.logger.info('Marking chain swaps with dropped lockup transactions as failed');
+
+        const stuckSwapIds = [
+          'porxbVKRHrK4',
+        ];
+
+        const [, updated] = await this.sequelize.query(
+          `UPDATE "chainSwaps" SET status = $1, "failureReason" = $2, "updatedAt" = NOW() WHERE id = ANY($3::text[])`,
+          {
+            bind: [
+              SwapUpdateEvent.TransactionFailed,
+              'cleanup: lockup transaction dropped from mempool',
+              stuckSwapIds,
+            ],
+            type: QueryTypes.UPDATE,
+          },
+        );
+
+        this.logger.info(`Marked ${updated} chain swaps as failed`);
 
         await this.finishMigration(versionRow.version, currencies);
         break;
