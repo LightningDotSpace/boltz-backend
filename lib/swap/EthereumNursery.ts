@@ -9,7 +9,6 @@ import {
   getHexString,
   removeHexPrefix,
   splitPairId,
-  stringify,
 } from '../Utils';
 import { etherDecimals } from '../consts/Consts';
 import {
@@ -27,7 +26,6 @@ import ChainSwapRepository from '../db/repositories/ChainSwapRepository';
 import ReverseSwapRepository from '../db/repositories/ReverseSwapRepository';
 import SwapRepository from '../db/repositories/SwapRepository';
 import WrappedSwapRepository from '../db/repositories/WrappedSwapRepository';
-import PendingEthereumTransactionRepository from '../db/repositories/PendingEthereumTransactionRepository';
 import type Wallet from '../wallet/Wallet';
 import type WalletManager from '../wallet/WalletManager';
 import type EthereumManager from '../wallet/ethereum/EthereumManager';
@@ -68,9 +66,6 @@ class EthereumNursery extends TypedEventEmitter<{
     isEtherSwap: boolean;
   };
 }> {
-  private static readonly droppedConfirmationsRequired = 2;
-  private readonly droppedLockupCounts = new Map<string, number>();
-
   constructor(
     private readonly logger: Logger,
     private readonly walletManager: WalletManager,
@@ -564,7 +559,6 @@ class EthereumNursery extends TypedEventEmitter<{
           this.checkExpiredSwaps(height),
           this.checkExpiredChainSwaps(height),
           this.checkExpiredReverseSwaps(height),
-          this.checkDroppedLockupTransactions(),
         ]);
       })
       .catch((err) => {
@@ -638,148 +632,6 @@ class EthereumNursery extends TypedEventEmitter<{
           isEtherSwap:
             wallet.symbol === this.ethereumManager.networkDetails.symbol,
         });
-      }
-    }
-  };
-
-  private checkDroppedLockupTransactions = async (): Promise<void> => {
-    const mempoolSwaps: (ReverseSwap | ChainSwapInfo)[] = (
-      await Promise.all([
-        ReverseSwapRepository.getReverseSwaps({
-          status: SwapUpdateEvent.TransactionMempool,
-        }),
-        ChainSwapRepository.getChainSwaps({
-          status: SwapUpdateEvent.TransactionServerMempool,
-        }),
-      ])
-    ).flat();
-
-    for (const swap of mempoolSwaps) {
-      let chainCurrency: string;
-
-      if (swap.type === SwapType.ReverseSubmarine) {
-        const { base, quote } = splitPairId(swap.pair);
-        chainCurrency = getChainCurrency(base, quote, swap.orderSide, true);
-      } else {
-        chainCurrency = (swap as ChainSwapInfo).sendingData.symbol;
-      }
-
-      if (this.getEthereumWallet(chainCurrency) === undefined) {
-        continue;
-      }
-
-      const transactionId =
-        swap.type === SwapType.ReverseSubmarine
-          ? (swap as ReverseSwap).transactionId
-          : (swap as ChainSwapInfo).sendingData.transactionId;
-
-      if (!transactionId) {
-        continue;
-      }
-
-      try {
-        const transaction =
-          await this.ethereumManager.provider.getTransaction(transactionId);
-
-        if (transaction !== null) {
-          this.droppedLockupCounts.delete(swap.id);
-          continue;
-        }
-
-        const count = (this.droppedLockupCounts.get(swap.id) ?? 0) + 1;
-        this.droppedLockupCounts.set(swap.id, count);
-
-        if (count < EthereumNursery.droppedConfirmationsRequired) {
-          this.logger.debug(
-            `${this.ethereumManager.networkDetails.name} lockup transaction ${transactionId} of ${swapTypeToPrettyString(swap.type)} Swap ${swap.id} not found (${count}/${EthereumNursery.droppedConfirmationsRequired})`,
-          );
-          continue;
-        }
-
-        this.droppedLockupCounts.delete(swap.id);
-
-        let pendingTxDiagnostics: Record<string, unknown> = {};
-        let removedPendingTx = false;
-
-        try {
-          const pendingTx =
-            await PendingEthereumTransactionRepository.getTransaction(
-              transactionId,
-              this.ethereumManager.networkDetails.name,
-            );
-
-          pendingTxDiagnostics = {
-            foundInPendingTable: pendingTx !== null,
-          };
-
-          if (pendingTx !== null) {
-            try {
-              const parsed = Transaction.from(pendingTx.hex);
-              pendingTxDiagnostics = {
-                ...pendingTxDiagnostics,
-                chain: pendingTx.chainIdentifier,
-                hash: pendingTx.hash,
-                nonce: pendingTx.nonce,
-                etherAmount: pendingTx.etherAmount?.toString(),
-                from: parsed.from,
-                to: parsed.to,
-                type: parsed.type,
-                gasLimit: parsed.gasLimit?.toString(),
-                gasPrice: parsed.gasPrice?.toString(),
-                maxFeePerGas: parsed.maxFeePerGas?.toString(),
-                maxPriorityFeePerGas: parsed.maxPriorityFeePerGas?.toString(),
-                value: parsed.value?.toString(),
-                dataBytes:
-                  parsed.data === undefined || parsed.data === null
-                    ? undefined
-                    : Math.max((parsed.data.length - 2) / 2, 0),
-              };
-            } catch (error) {
-              pendingTxDiagnostics = {
-                ...pendingTxDiagnostics,
-                decodeError: formatError(error),
-              };
-            }
-
-            await PendingEthereumTransactionRepository.removeTransaction(pendingTx.hash);
-            removedPendingTx = true;
-          }
-        } catch (error) {
-          this.logger.warn(
-            `Failed to lookup/remove pending ${this.ethereumManager.networkDetails.name} transaction ${transactionId}: ${formatError(error)}`,
-          );
-          pendingTxDiagnostics = {
-            ...pendingTxDiagnostics,
-            pendingTxError: formatError(error),
-          };
-        }
-
-        this.logger.warn(
-          `${this.ethereumManager.networkDetails.name} lockup transaction dropped from mempool: ${stringify(
-            {
-              swapId: swap.id,
-              swapType: swap.type,
-              swapStatus: swap.status,
-              transactionId,
-              chainCurrency,
-              missingChecks: count,
-              removedPendingTx,
-              pendingTx: pendingTxDiagnostics,
-            },
-          )}`,
-        );
-        this.emit('lockup.failedToSend', {
-          reason: 'lockup transaction dropped from mempool',
-          swap: await WrappedSwapRepository.setStatus(
-            swap,
-            SwapUpdateEvent.TransactionFailed,
-          ),
-        });
-      } catch (error) {
-        this.droppedLockupCounts.delete(swap.id);
-        this.logger.error(
-          `Could not check ${this.ethereumManager.networkDetails.name} lockup transaction ${transactionId} of ${swapTypeToPrettyString(swap.type)} Swap ${swap.id}: ${formatError(error)}`,
-        );
       }
     }
   };
