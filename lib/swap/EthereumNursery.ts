@@ -66,6 +66,9 @@ class EthereumNursery extends TypedEventEmitter<{
     isEtherSwap: boolean;
   };
 }> {
+  private static readonly droppedConfirmationsRequired = 2;
+  private readonly droppedLockupCounts = new Map<string, number>();
+
   constructor(
     private readonly logger: Logger,
     private readonly walletManager: WalletManager,
@@ -116,14 +119,29 @@ class EthereumNursery extends TypedEventEmitter<{
         const transaction = await this.ethereumManager.provider.getTransaction(
           transactionId!,
         );
+
+        if (transaction === null) {
+          this.logger.warn(
+            `${this.ethereumManager.networkDetails.name} lockup transaction ${transactionId} of ${swapTypeToPrettyString(swap.type)} Swap ${swap.id} not found on startup, marking as failed`,
+          );
+          this.emit('lockup.failedToSend', {
+            reason: 'lockup transaction not found on startup',
+            swap: await WrappedSwapRepository.setStatus(
+              swap,
+              SwapUpdateEvent.TransactionFailed,
+            ),
+          });
+          continue;
+        }
+
         this.logger.debug(
           `Found ${this.ethereumManager.networkDetails.name} lockup transaction of ${swapTypeToPrettyString(swap.type)} Swap ${swap.id}: ${transactionId}`,
         );
-        this.listenContractTransaction(swap, transaction!);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        this.listenContractTransaction(swap, transaction);
       } catch (error) {
-        // TODO: retry finding that transaction
-        // If the provider can't find the transaction, it is not on the Ethereum chain
+        this.logger.error(
+          `Could not fetch ${this.ethereumManager.networkDetails.name} lockup transaction ${transactionId} of ${swapTypeToPrettyString(swap.type)} Swap ${swap.id}: ${formatError(error)}`,
+        );
       }
     }
   };
@@ -544,6 +562,7 @@ class EthereumNursery extends TypedEventEmitter<{
           this.checkExpiredSwaps(height),
           this.checkExpiredChainSwaps(height),
           this.checkExpiredReverseSwaps(height),
+          this.checkDroppedLockupTransactions(),
         ]);
       })
       .catch((err) => {
@@ -617,6 +636,80 @@ class EthereumNursery extends TypedEventEmitter<{
           isEtherSwap:
             wallet.symbol === this.ethereumManager.networkDetails.symbol,
         });
+      }
+    }
+  };
+
+  private checkDroppedLockupTransactions = async (): Promise<void> => {
+    const mempoolSwaps: (ReverseSwap | ChainSwapInfo)[] = (
+      await Promise.all([
+        ReverseSwapRepository.getReverseSwaps({
+          status: SwapUpdateEvent.TransactionMempool,
+        }),
+        ChainSwapRepository.getChainSwaps({
+          status: SwapUpdateEvent.TransactionServerMempool,
+        }),
+      ])
+    ).flat();
+
+    for (const swap of mempoolSwaps) {
+      let chainCurrency: string;
+
+      if (swap.type === SwapType.ReverseSubmarine) {
+        const { base, quote } = splitPairId(swap.pair);
+        chainCurrency = getChainCurrency(base, quote, swap.orderSide, true);
+      } else {
+        chainCurrency = (swap as ChainSwapInfo).sendingData.symbol;
+      }
+
+      if (this.getEthereumWallet(chainCurrency) === undefined) {
+        continue;
+      }
+
+      const transactionId =
+        swap.type === SwapType.ReverseSubmarine
+          ? (swap as ReverseSwap).transactionId
+          : (swap as ChainSwapInfo).sendingData.transactionId;
+
+      if (!transactionId) {
+        continue;
+      }
+
+      try {
+        const transaction =
+          await this.ethereumManager.provider.getTransaction(transactionId);
+
+        if (transaction !== null) {
+          this.droppedLockupCounts.delete(swap.id);
+          continue;
+        }
+
+        const count = (this.droppedLockupCounts.get(swap.id) ?? 0) + 1;
+        this.droppedLockupCounts.set(swap.id, count);
+
+        if (count < EthereumNursery.droppedConfirmationsRequired) {
+          this.logger.debug(
+            `${this.ethereumManager.networkDetails.name} lockup transaction ${transactionId} of ${swapTypeToPrettyString(swap.type)} Swap ${swap.id} not found (${count}/${EthereumNursery.droppedConfirmationsRequired})`,
+          );
+          continue;
+        }
+
+        this.droppedLockupCounts.delete(swap.id);
+        this.logger.warn(
+          `${this.ethereumManager.networkDetails.name} lockup transaction ${transactionId} of ${swapTypeToPrettyString(swap.type)} Swap ${swap.id} dropped from mempool`,
+        );
+        this.emit('lockup.failedToSend', {
+          reason: 'lockup transaction dropped from mempool',
+          swap: await WrappedSwapRepository.setStatus(
+            swap,
+            SwapUpdateEvent.TransactionFailed,
+          ),
+        });
+      } catch (error) {
+        this.droppedLockupCounts.delete(swap.id);
+        this.logger.error(
+          `Could not check ${this.ethereumManager.networkDetails.name} lockup transaction ${transactionId} of ${swapTypeToPrettyString(swap.type)} Swap ${swap.id}: ${formatError(error)}`,
+        );
       }
     }
   };
