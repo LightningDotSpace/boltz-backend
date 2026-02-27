@@ -741,7 +741,7 @@ class EthereumNursery extends TypedEventEmitter<{
               };
             }
 
-            await pendingTx.destroy();
+            await PendingEthereumTransactionRepository.removeTransaction(pendingTx.hash);
             removedPendingTx = true;
           }
         } catch (error) {

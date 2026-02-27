@@ -51,6 +51,12 @@ class PendingEthereumTransactionRepository {
     );
   };
 
+  public static removeTransaction = (hash: string): Promise<number> => {
+    return PendingEthereumTransaction.destroy({
+      where: { hash },
+    });
+  };
+
   public static addTransaction = (
     hash: string,
     chainIdentifier: string,
