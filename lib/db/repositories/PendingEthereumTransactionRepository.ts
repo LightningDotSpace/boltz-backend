@@ -15,6 +15,15 @@ class PendingEthereumTransactionRepository {
     return PendingEthereumTransaction.findAll();
   };
 
+  public static getTransaction = (
+    hash: string,
+    chainIdentifier: string,
+  ): Promise<PendingEthereumTransaction | null> => {
+    return PendingEthereumTransaction.findOne({
+      where: { hash, chainIdentifier },
+    });
+  };
+
   public static getHighestNonce = async (
     chainIdentifier: string,
   ): Promise<number | undefined> => {
