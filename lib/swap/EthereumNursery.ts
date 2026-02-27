@@ -697,51 +697,63 @@ class EthereumNursery extends TypedEventEmitter<{
         }
 
         this.droppedLockupCounts.delete(swap.id);
-        
-        const pendingTx =
-          await PendingEthereumTransactionRepository.getTransaction(
-            transactionId,
-            this.ethereumManager.networkDetails.name,
-          );
 
-        let pendingTxDiagnostics: Record<string, unknown> = {
-          foundInPendingTable: pendingTx !== null,
-        };
+        let pendingTxDiagnostics: Record<string, unknown> = {};
+        let removedPendingTx = false;
 
-        if (pendingTx !== null) {
-          try {
-            const parsed = Transaction.from(pendingTx.hex);
-            pendingTxDiagnostics = {
-              ...pendingTxDiagnostics,
-              chain: pendingTx.chainIdentifier,
-              hash: pendingTx.hash,
-              nonce: pendingTx.nonce,
-              etherAmount: pendingTx.etherAmount?.toString(),
-              from: parsed.from,
-              to: parsed.to,
-              type: parsed.type,
-              gasLimit: parsed.gasLimit?.toString(),
-              gasPrice: parsed.gasPrice?.toString(),
-              maxFeePerGas: parsed.maxFeePerGas?.toString(),
-              maxPriorityFeePerGas: parsed.maxPriorityFeePerGas?.toString(),
-              value: parsed.value?.toString(),
-              dataBytes:
-                parsed.data === undefined || parsed.data === null
-                  ? undefined
-                  : Math.max((parsed.data.length - 2) / 2, 0),
-            };
-          } catch (error) {
-            pendingTxDiagnostics = {
-              ...pendingTxDiagnostics,
-              decodeError: formatError(error),
-            };
+        try {
+          const pendingTx =
+            await PendingEthereumTransactionRepository.getTransaction(
+              transactionId,
+              this.ethereumManager.networkDetails.name,
+            );
+
+          pendingTxDiagnostics = {
+            foundInPendingTable: pendingTx !== null,
+          };
+
+          if (pendingTx !== null) {
+            try {
+              const parsed = Transaction.from(pendingTx.hex);
+              pendingTxDiagnostics = {
+                ...pendingTxDiagnostics,
+                chain: pendingTx.chainIdentifier,
+                hash: pendingTx.hash,
+                nonce: pendingTx.nonce,
+                etherAmount: pendingTx.etherAmount?.toString(),
+                from: parsed.from,
+                to: parsed.to,
+                type: parsed.type,
+                gasLimit: parsed.gasLimit?.toString(),
+                gasPrice: parsed.gasPrice?.toString(),
+                maxFeePerGas: parsed.maxFeePerGas?.toString(),
+                maxPriorityFeePerGas: parsed.maxPriorityFeePerGas?.toString(),
+                value: parsed.value?.toString(),
+                dataBytes:
+                  parsed.data === undefined || parsed.data === null
+                    ? undefined
+                    : Math.max((parsed.data.length - 2) / 2, 0),
+              };
+            } catch (error) {
+              pendingTxDiagnostics = {
+                ...pendingTxDiagnostics,
+                decodeError: formatError(error),
+              };
+            }
+
+            await pendingTx.destroy();
+            removedPendingTx = true;
           }
+        } catch (error) {
+          this.logger.warn(
+            `Failed to lookup/remove pending ${this.ethereumManager.networkDetails.name} transaction ${transactionId}: ${formatError(error)}`,
+          );
+          pendingTxDiagnostics = {
+            ...pendingTxDiagnostics,
+            pendingTxError: formatError(error),
+          };
         }
 
-        const removedPendingTx = pendingTx !== null;
-        if (pendingTx !== null) {
-          await pendingTx.destroy();
-        }
         this.logger.warn(
           `${this.ethereumManager.networkDetails.name} lockup transaction dropped from mempool: ${stringify(
             {
