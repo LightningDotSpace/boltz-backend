@@ -9,6 +9,7 @@ import {
   getHexString,
   removeHexPrefix,
   splitPairId,
+  stringify,
 } from '../Utils';
 import { etherDecimals } from '../consts/Consts';
 import {
@@ -26,6 +27,7 @@ import ChainSwapRepository from '../db/repositories/ChainSwapRepository';
 import ReverseSwapRepository from '../db/repositories/ReverseSwapRepository';
 import SwapRepository from '../db/repositories/SwapRepository';
 import WrappedSwapRepository from '../db/repositories/WrappedSwapRepository';
+import PendingEthereumTransactionRepository from '../db/repositories/PendingEthereumTransactionRepository';
 import type Wallet from '../wallet/Wallet';
 import type WalletManager from '../wallet/WalletManager';
 import type EthereumManager from '../wallet/ethereum/EthereumManager';
@@ -695,8 +697,76 @@ class EthereumNursery extends TypedEventEmitter<{
         }
 
         this.droppedLockupCounts.delete(swap.id);
+
+        let pendingTxDiagnostics: Record<string, unknown> = {};
+        let removedPendingTx = false;
+
+        try {
+          const pendingTx =
+            await PendingEthereumTransactionRepository.getTransaction(
+              transactionId,
+              this.ethereumManager.networkDetails.name,
+            );
+
+          pendingTxDiagnostics = {
+            foundInPendingTable: pendingTx !== null,
+          };
+
+          if (pendingTx !== null) {
+            try {
+              const parsed = Transaction.from(pendingTx.hex);
+              pendingTxDiagnostics = {
+                ...pendingTxDiagnostics,
+                chain: pendingTx.chainIdentifier,
+                hash: pendingTx.hash,
+                nonce: pendingTx.nonce,
+                etherAmount: pendingTx.etherAmount?.toString(),
+                from: parsed.from,
+                to: parsed.to,
+                type: parsed.type,
+                gasLimit: parsed.gasLimit?.toString(),
+                gasPrice: parsed.gasPrice?.toString(),
+                maxFeePerGas: parsed.maxFeePerGas?.toString(),
+                maxPriorityFeePerGas: parsed.maxPriorityFeePerGas?.toString(),
+                value: parsed.value?.toString(),
+                dataBytes:
+                  parsed.data === undefined || parsed.data === null
+                    ? undefined
+                    : Math.max((parsed.data.length - 2) / 2, 0),
+              };
+            } catch (error) {
+              pendingTxDiagnostics = {
+                ...pendingTxDiagnostics,
+                decodeError: formatError(error),
+              };
+            }
+
+            await PendingEthereumTransactionRepository.removeTransaction(pendingTx.hash);
+            removedPendingTx = true;
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Failed to lookup/remove pending ${this.ethereumManager.networkDetails.name} transaction ${transactionId}: ${formatError(error)}`,
+          );
+          pendingTxDiagnostics = {
+            ...pendingTxDiagnostics,
+            pendingTxError: formatError(error),
+          };
+        }
+
         this.logger.warn(
-          `${this.ethereumManager.networkDetails.name} lockup transaction ${transactionId} of ${swapTypeToPrettyString(swap.type)} Swap ${swap.id} dropped from mempool`,
+          `${this.ethereumManager.networkDetails.name} lockup transaction dropped from mempool: ${stringify(
+            {
+              swapId: swap.id,
+              swapType: swap.type,
+              swapStatus: swap.status,
+              transactionId,
+              chainCurrency,
+              missingChecks: count,
+              removedPendingTx,
+              pendingTx: pendingTxDiagnostics,
+            },
+          )}`,
         );
         this.emit('lockup.failedToSend', {
           reason: 'lockup transaction dropped from mempool',
