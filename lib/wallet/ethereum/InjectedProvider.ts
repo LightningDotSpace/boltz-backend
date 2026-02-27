@@ -305,9 +305,38 @@ class InjectedProvider implements Provider {
       );
 
       if (inMempool === null) {
+        let decoded: Record<string, unknown> = {};
+        try {
+          const parsed = Transaction.from(tx.hex);
+          decoded = {
+            from: parsed.from,
+            to: parsed.to,
+            type: parsed.type,
+            gasLimit: parsed.gasLimit?.toString(),
+            gasPrice: parsed.gasPrice?.toString(),
+            maxFeePerGas: parsed.maxFeePerGas?.toString(),
+            maxPriorityFeePerGas: parsed.maxPriorityFeePerGas?.toString(),
+            value: parsed.value?.toString(),
+            dataBytes:
+              parsed.data === undefined || parsed.data === null
+                ? undefined
+                : Math.max((parsed.data.length - 2) / 2, 0),
+          };
+        } catch (error) {
+          decoded = { decodeError: formatError(error) };
+        }
+
         // Transaction was dropped from mempool, reuse this nonce
         this.logger.warn(
-          `${this.networkDetails.name} transaction ${tx.hash} dropped from mempool, reusing nonce ${tx.nonce}`,
+          `${this.networkDetails.name} transaction dropped from mempool, reusing nonce ${tx.nonce}: ${stringify(
+            {
+              chain: tx.chainIdentifier,
+              hash: tx.hash,
+              nonce: tx.nonce,
+              etherAmount: tx.etherAmount?.toString(),
+              ...decoded,
+            },
+          )}`,
         );
         await tx.destroy();
         return tx.nonce;
