@@ -3,6 +3,7 @@ import AsyncLock from 'async-lock';
 import type {
   Provider,
   Signer,
+  TransactionResponse,
   TransactionRequest,
   TypedDataDomain,
   TypedDataField,
@@ -69,6 +70,49 @@ class SequentialSigner extends AbstractSigner {
     types: Record<string, Array<TypedDataField>>,
     value: Record<string, any>,
   ): Promise<string> => this.signer.signTypedData(domain, types, value);
+
+  public sendTransaction = async (
+    tx: TransactionRequest,
+  ): Promise<TransactionResponse> => {
+    const span = Tracing.tracer.startSpan(
+      `Sending ${this.symbol} transaction`,
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          nonce: tx.nonce?.toString(),
+          value: tx.value?.toString(),
+        },
+      },
+    );
+    const ctx = trace.setSpan(context.active(), span);
+
+    try {
+      return await this.lock.acquire(SequentialSigner.txLock, async () =>
+        context.with(ctx, async () => {
+          if (tx.value !== undefined && tx.value !== null) {
+            const [ourBalance, pendingTxsValue] = await Promise.all([
+              this.signer.provider!.getBalance(await this.getAddress()),
+              PendingEthereumTransactionRepository.getTotalSent(this.chainIdentifier),
+            ]);
+
+            if (ourBalance - pendingTxsValue < BigInt(tx.value)) {
+              throw new Error('insufficient balance');
+            }
+          }
+
+          return await this.signer.sendTransaction(tx);
+        }),
+      );
+    } catch (error) {
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: formatError(error),
+      });
+      throw error;
+    } finally {
+      span.end();
+    }
+  };
 
   private signTransactionInternal = async (tx: TransactionRequest) => {
     return await this.lock.acquire(SequentialSigner.txLock, async () => {

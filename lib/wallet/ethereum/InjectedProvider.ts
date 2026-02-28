@@ -326,9 +326,8 @@ class InjectedProvider implements Provider {
           decoded = { decodeError: formatError(error) };
         }
 
-        // Transaction was dropped from mempool, reuse this nonce
         this.logger.warn(
-          `${this.networkDetails.name} transaction dropped from mempool, reusing nonce ${tx.nonce}: ${stringify(
+          `${this.networkDetails.name} transaction not found by provider for nonce ${tx.nonce}: ${stringify(
             {
               chain: tx.chainIdentifier,
               hash: tx.hash,
@@ -338,8 +337,6 @@ class InjectedProvider implements Provider {
             },
           )}`,
         );
-        await tx.destroy();
-        return tx.nonce;
       }
 
       nextNonce++;
@@ -366,6 +363,17 @@ class InjectedProvider implements Provider {
 
   public resolveName = (name: string): Promise<string> => {
     return this.forwardMethod('resolveName', name);
+  };
+
+  public rebroadcastRawTransaction = async (
+    signedTransaction: string,
+  ): Promise<boolean> => {
+    const settled = await Promise.allSettled(
+      Array.from(this.providers.values()).map((provider) =>
+        provider.broadcastTransaction(signedTransaction),
+      ),
+    );
+    return settled.some((r) => r.status === 'fulfilled');
   };
 
   public broadcastTransaction = async (
