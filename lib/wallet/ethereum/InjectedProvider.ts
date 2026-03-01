@@ -26,7 +26,6 @@ import type {
 } from '../../Config';
 import type Logger from '../../Logger';
 import { formatError, stringify } from '../../Utils';
-import PendingEthereumTransactionRepository from '../../db/repositories/PendingEthereumTransactionRepository';
 import Errors from './Errors';
 import type { NetworkDetails } from './EvmNetworks';
 
@@ -37,8 +36,9 @@ enum EthProviderService {
 }
 
 /**
- * This provider is a wrapper for the JsonRpcProvider of ethers, but it writes sent transactions to the database
- * and, depending on the configuration, falls back to Alchemy and Infura as Web3 provider
+ * Multi-provider wrapper for ethers JsonRpcProvider.
+ * Falls back to Alchemy and Infura as Web3 provider.
+ * Transaction DB recording is handled by SequentialSigner, not here.
  */
 class InjectedProvider implements Provider {
   public readonly provider: this;
@@ -249,103 +249,11 @@ class InjectedProvider implements Provider {
     return this.forwardMethodNullable('getTransaction', transactionHash);
   };
 
-  public getTransactionCount = async (
+  public getTransactionCount = (
     addressOrName: string,
     blockTag?: BlockTag,
   ): Promise<number> => {
-    // Always get blockchain nonce as baseline
-    const chainNonce = await this.forwardMethod(
-      'getTransactionCount',
-      addressOrName,
-      blockTag ?? 'pending',
-    );
-
-    const pendingTxs =
-      await PendingEthereumTransactionRepository.getTransactions(
-        this.networkDetails.name,
-      );
-
-    if (pendingTxs.length === 0) {
-      return chainNonce;
-    }
-
-    // Sort by nonce ascending
-    const sorted = [...pendingTxs].sort((a, b) => a.nonce - b.nonce);
-
-    // Remove stale transactions (nonce < chainNonce means already confirmed or replaced)
-    for (const tx of sorted.filter((t) => t.nonce < chainNonce)) {
-      this.logger.info(
-        `Removing confirmed/replaced ${this.networkDetails.name} transaction: ${tx.hash} (nonce ${tx.nonce})`,
-      );
-      await tx.destroy();
-    }
-
-    // Only consider transactions with nonce >= chainNonce
-    const relevant = sorted.filter((t) => t.nonce >= chainNonce);
-
-    if (relevant.length === 0) {
-      return chainNonce;
-    }
-
-    // Check for gaps and dropped transactions
-    let nextNonce = chainNonce;
-    for (const tx of relevant) {
-      // Gap in nonce sequence found
-      if (tx.nonce !== nextNonce) {
-        this.logger.warn(
-          `Nonce gap detected: expected ${nextNonce}, found ${tx.nonce}. Filling gap.`,
-        );
-        return nextNonce;
-      }
-
-      // Check if transaction is still in mempool
-      const inMempool = await this.forwardMethodNullable(
-        'getTransaction',
-        tx.hash,
-      );
-
-      if (inMempool === null) {
-        let decoded: Record<string, unknown> = {};
-        try {
-          const parsed = Transaction.from(tx.hex);
-          decoded = {
-            from: parsed.from,
-            to: parsed.to,
-            type: parsed.type,
-            gasLimit: parsed.gasLimit?.toString(),
-            gasPrice: parsed.gasPrice?.toString(),
-            maxFeePerGas: parsed.maxFeePerGas?.toString(),
-            maxPriorityFeePerGas: parsed.maxPriorityFeePerGas?.toString(),
-            value: parsed.value?.toString(),
-            dataBytes:
-              parsed.data === undefined || parsed.data === null
-                ? undefined
-                : Math.max((parsed.data.length - 2) / 2, 0),
-          };
-        } catch (error) {
-          decoded = { decodeError: formatError(error) };
-        }
-
-        // Transaction was dropped from mempool, reuse this nonce
-        this.logger.warn(
-          `${this.networkDetails.name} transaction dropped from mempool, reusing nonce ${tx.nonce}: ${stringify(
-            {
-              chain: tx.chainIdentifier,
-              hash: tx.hash,
-              nonce: tx.nonce,
-              etherAmount: tx.etherAmount?.toString(),
-              ...decoded,
-            },
-          )}`,
-        );
-        await tx.destroy();
-        return tx.nonce;
-      }
-
-      nextNonce++;
-    }
-
-    return nextNonce;
+    return this.forwardMethod('getTransactionCount', addressOrName, blockTag);
   };
 
   public getTransactionReceipt = (
@@ -368,14 +276,20 @@ class InjectedProvider implements Provider {
     return this.forwardMethod('resolveName', name);
   };
 
+  public rebroadcastRawTransaction = async (
+    signedTransaction: string,
+  ): Promise<boolean> => {
+    const settled = await Promise.allSettled(
+      Array.from(this.providers.values()).map((provider) =>
+        provider.broadcastTransaction(signedTransaction),
+      ),
+    );
+    return settled.some((r) => r.status === 'fulfilled');
+  };
+
   public broadcastTransaction = async (
     signedTransaction: string,
   ): Promise<TransactionResponse> => {
-    const tx = Transaction.from(signedTransaction);
-    await this.addToTransactionDatabase(tx);
-
-    // When sending a transaction, you want it to propagate on the network as quickly as possible
-    // Therefore, we send it to all available providers
     const promises = Array.from(this.providers.values()).map((provider) =>
       provider.broadcastTransaction(signedTransaction),
     );
@@ -392,24 +306,12 @@ class InjectedProvider implements Provider {
       return results[0];
     }
 
+    const tx = Transaction.from(signedTransaction);
     const error = (settled[0] as PromiseRejectedResult).reason;
     this.logger.error(
       `Failed to broadcast ${this.networkDetails.name} transaction ${tx.hash}: ${formatError(error)}`,
     );
     throw error;
-  };
-
-  public sendTransaction = async (
-    tx: TransactionRequest,
-  ): Promise<TransactionResponse> => {
-    const res = await this.forwardMethod<Promise<TransactionResponse>>(
-      'sendTransaction',
-      tx,
-    );
-
-    await this.addToTransactionDatabase(Transaction.from(res));
-
-    return res;
   };
 
   public waitForTransaction = (
@@ -610,19 +512,6 @@ class InjectedProvider implements Provider {
       clearTimeout(timeoutHandle);
       return result;
     });
-  };
-
-  private addToTransactionDatabase = async (tx: Transaction) => {
-    this.logger.silly(
-      `Sending ${this.networkDetails.name} transaction: ${tx.hash}`,
-    );
-    await PendingEthereumTransactionRepository.addTransaction(
-      tx.hash!,
-      this.networkDetails.name,
-      tx.nonce,
-      tx.value,
-      tx.serialized,
-    );
   };
 
   private hashCode = (value: string): number => {

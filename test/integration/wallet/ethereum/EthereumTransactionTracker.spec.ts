@@ -30,7 +30,6 @@ describe('EthereumTransactionTracker', () => {
       Logger.disabledLogger,
       Ethereum,
       setup.provider,
-      setup.signer,
     );
     await fundSignerWallet(setup.signer, setup.etherBase);
 

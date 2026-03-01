@@ -10,7 +10,7 @@ import {
 } from 'ethers';
 import type { EvmConfig } from '../../Config';
 import type Logger from '../../Logger';
-import { stringify } from '../../Utils';
+import { formatError, stringify } from '../../Utils';
 import { CurrencyType } from '../../consts/Enums';
 import ChainTipRepository from '../../db/repositories/ChainTipRepository';
 import Errors from '../Errors';
@@ -84,6 +84,7 @@ class EthereumManager {
     };
 
     this.signer = new SequentialSigner(
+      this.logger,
       this.networkDetails.symbol,
       this.networkDetails.name,
       EthersWallet.fromPhrase(mnemonic),
@@ -111,7 +112,6 @@ class EthereumManager {
       this.logger,
       this.networkDetails,
       this.provider,
-      this.signer,
     );
 
     for (const contracts of this.config.contracts) {
@@ -129,7 +129,11 @@ class EthereumManager {
 
       await Promise.all([
         ChainTipRepository.updateTip(chainTip, blockNumber),
-        transactionTracker.scanPendingTransactions(),
+        transactionTracker.scanPendingTransactions().catch((e) =>
+          this.logger.error(
+            `${this.networkDetails.name} transaction scan failed: ${formatError(e)}`,
+          ),
+        ),
       ]);
     });
 

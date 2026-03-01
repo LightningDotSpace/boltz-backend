@@ -1,3 +1,4 @@
+import Logger from '../../../../lib/Logger';
 import PendingEthereumTransactionRepository from '../../../../lib/db/repositories/PendingEthereumTransactionRepository';
 import SequentialSigner from '../../../../lib/wallet/ethereum/SequentialSigner';
 import type { EthereumSetup } from '../EthereumTools';
@@ -9,13 +10,27 @@ describe('SequentialSigner', () => {
 
   beforeAll(async () => {
     setup = await getSigner();
-    signer = new SequentialSigner('ETH', 'Ethereum', setup.signer);
+    signer = new SequentialSigner(
+      Logger.disabledLogger,
+      'ETH',
+      'Ethereum',
+      setup.signer,
+    );
 
     await fundSignerWallet(setup.signer, setup.etherBase);
 
     PendingEthereumTransactionRepository.getTotalSent = jest
       .fn()
       .mockResolvedValue(0n);
+    PendingEthereumTransactionRepository.getHighestNonce = jest
+      .fn()
+      .mockResolvedValue(undefined);
+    PendingEthereumTransactionRepository.addTransaction = jest
+      .fn()
+      .mockResolvedValue({});
+    PendingEthereumTransactionRepository.removeTransaction = jest
+      .fn()
+      .mockResolvedValue(1);
   });
 
   test('should get address', async () => {
