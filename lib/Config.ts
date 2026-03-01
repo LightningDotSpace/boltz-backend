@@ -129,6 +129,8 @@ type EvmConfig = {
   alchemy: EthProviderServiceConfig;
   infura: EthProviderServiceConfig;
 
+  publicBroadcastRpcs?: string[];
+
   contracts: ContractsConfig[];
 
   tokens: TokenConfig[];
