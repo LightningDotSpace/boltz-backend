@@ -44,6 +44,7 @@ class InjectedProvider implements Provider {
   public readonly provider: this;
 
   private providers = new Map<string, JsonRpcProvider>();
+  private readonly publicBroadcastRpcs: string[];
 
   private network!: Network;
 
@@ -55,6 +56,7 @@ class InjectedProvider implements Provider {
     config: EvmConfig,
   ) {
     this.provider = this;
+    this.publicBroadcastRpcs = config.publicBroadcastRpcs ?? [];
 
     if (config.providerEndpoint) {
       this.providers.set(
@@ -374,11 +376,11 @@ class InjectedProvider implements Provider {
     const tx = Transaction.from(signedTransaction);
     await this.addToTransactionDatabase(tx);
 
-    // When sending a transaction, you want it to propagate on the network as quickly as possible
-    // Therefore, we send it to all available providers
     const promises = Array.from(this.providers.values()).map((provider) =>
       provider.broadcastTransaction(signedTransaction),
     );
+
+    this.broadcastToPublicRpcs(signedTransaction, tx.hash!);
 
     const settled = await Promise.allSettled(promises);
     const results = settled
@@ -610,6 +612,34 @@ class InjectedProvider implements Provider {
       clearTimeout(timeoutHandle);
       return result;
     });
+  };
+
+  private broadcastToPublicRpcs = (
+    signedTransaction: string,
+    txHash: string,
+  ): void => {
+    if (this.publicBroadcastRpcs.length === 0) return;
+
+    this.logger.verbose(
+      `Broadcasting ${this.networkDetails.name} tx ${txHash} to ${this.publicBroadcastRpcs.length} public RPCs`,
+    );
+
+    for (const rpcUrl of this.publicBroadcastRpcs) {
+      const provider = new JsonRpcProvider(rpcUrl);
+      provider
+        .broadcastTransaction(signedTransaction)
+        .then(() => {
+          this.logger.info(
+            `Public RPC broadcast success for ${txHash}: ${rpcUrl}`,
+          );
+        })
+        .catch((error) => {
+          this.logger.warn(
+            `Public RPC broadcast failed for ${txHash} via ${rpcUrl}: ${formatError(error)}`,
+          );
+        })
+        .finally(() => provider.destroy());
+    }
   };
 
   private addToTransactionDatabase = async (tx: Transaction) => {
