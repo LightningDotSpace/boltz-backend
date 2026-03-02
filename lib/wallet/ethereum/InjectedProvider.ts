@@ -321,6 +321,31 @@ class InjectedProvider implements Provider {
           continue;
         }
 
+        // Not in mempool and no receipt — verify by rebroadcasting the
+        // stored signed tx. The RPC response tells us the real status:
+        //   "already known" → still pending, not dropped
+        //   "nonce too low"  → nonce consumed (by this tx or a replacement)
+        //   success          → re-entered mempool, not dropped
+        //   other error      → genuinely dropped
+        if (tx.hex) {
+          const rebroadcastStatus = await this.verifyTransactionByRebroadcast(
+            tx.hex,
+            tx.hash,
+            tx.nonce,
+          );
+
+          if (rebroadcastStatus !== 'dropped') {
+            if (rebroadcastStatus === 'nonceUsed') {
+              this.logger.info(
+                `${this.networkDetails.name} nonce ${tx.nonce} already consumed, removing pending tx ${tx.hash}`,
+              );
+              await tx.destroy();
+            }
+            nextNonce++;
+            continue;
+          }
+        }
+
         let decoded: Record<string, unknown> = {};
         try {
           const parsed = Transaction.from(tx.hex);
@@ -718,6 +743,45 @@ class InjectedProvider implements Provider {
     this.logger.warn(
       `Disabled ${this.networkDetails.name} RPC provider ${name}: ${reason}`,
     );
+  };
+
+  private verifyTransactionByRebroadcast = async (
+    hex: string,
+    txHash: string,
+    nonce: number,
+  ): Promise<'pending' | 'nonceUsed' | 'dropped'> => {
+    try {
+      const firstProvider = this.providers.values().next().value;
+      if (!firstProvider) return 'dropped';
+
+      await firstProvider.broadcastTransaction(hex);
+      this.logger.info(
+        `${this.networkDetails.name} tx ${txHash} (nonce ${nonce}) rebroadcast succeeded, not dropped`,
+      );
+      return 'pending';
+    } catch (error) {
+      const msg = formatError(error).toLowerCase();
+
+      if (msg.includes('already known') || msg.includes('alreadyknown')) {
+        this.logger.info(
+          `${this.networkDetails.name} tx ${txHash} (nonce ${nonce}) still in mempool (already known)`,
+        );
+        return 'pending';
+      }
+
+      if (
+        msg.includes('nonce too low') ||
+        msg.includes('nonce has already been used') ||
+        (error as any)?.code === 'NONCE_EXPIRED'
+      ) {
+        return 'nonceUsed';
+      }
+
+      this.logger.warn(
+        `${this.networkDetails.name} tx ${txHash} (nonce ${nonce}) rebroadcast failed, treating as dropped: ${formatError(error)}`,
+      );
+      return 'dropped';
+    }
   };
 
   private static isAlreadyKnownError = (error: unknown): boolean => {

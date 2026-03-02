@@ -1101,24 +1101,33 @@ class SwapNursery extends TypedEventEmitter<SwapNurseryEvents> {
     );
 
     ethereumNursery.on('claim', async ({ swap, preimage }) => {
-      await this.lock.acquire(
-        swap.type === SwapType.ReverseSubmarine
-          ? SwapNursery.reverseSwapLock
-          : SwapNursery.chainSwapLock,
-        async () => {
-          if (swap.type === SwapType.ReverseSubmarine) {
-            await this.settleReverseSwapInvoice(swap as ReverseSwap, preimage);
-          } else {
-            const chainSwap = swap as ChainSwapInfo;
-            await this.attemptSettleSwap(
-              this.currencies.get(chainSwap.receivingData.symbol)!,
-              chainSwap,
-              undefined,
-              preimage,
-            );
-          }
-        },
-      );
+      try {
+        await this.lock.acquire(
+          swap.type === SwapType.ReverseSubmarine
+            ? SwapNursery.reverseSwapLock
+            : SwapNursery.chainSwapLock,
+          async () => {
+            if (swap.type === SwapType.ReverseSubmarine) {
+              await this.settleReverseSwapInvoice(
+                swap as ReverseSwap,
+                preimage,
+              );
+            } else {
+              const chainSwap = swap as ChainSwapInfo;
+              await this.attemptSettleSwap(
+                this.currencies.get(chainSwap.receivingData.symbol)!,
+                chainSwap,
+                undefined,
+                preimage,
+              );
+            }
+          },
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to process claim for ${swapTypeToPrettyString(swap.type)} Swap ${swap.id}: ${formatError(error)}`,
+        );
+      }
     });
 
     ethereumNursery.on('chainSwap.expired', async ({ chainSwap }) => {
