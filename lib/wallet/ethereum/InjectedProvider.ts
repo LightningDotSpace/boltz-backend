@@ -407,6 +407,25 @@ class InjectedProvider implements Provider {
       return results[0];
     }
 
+    const rejected = settled.filter(
+      (res): res is PromiseRejectedResult => res.status === 'rejected',
+    );
+
+    const allAlreadyKnown = rejected.every((res) =>
+      InjectedProvider.isAlreadyKnownError(res.reason),
+    );
+
+    if (allAlreadyKnown && tx.hash) {
+      this.logger.info(
+        `${this.networkDetails.name} transaction ${tx.hash} already in mempool, treating as success`,
+      );
+
+      const existing = await this.getTransaction(tx.hash);
+      if (existing) {
+        return existing;
+      }
+    }
+
     const error = (settled[0] as PromiseRejectedResult).reason;
     this.logger.error(
       `Failed to broadcast ${this.networkDetails.name} transaction ${tx.hash}: ${formatError(error)}`,
@@ -699,6 +718,11 @@ class InjectedProvider implements Provider {
     this.logger.warn(
       `Disabled ${this.networkDetails.name} RPC provider ${name}: ${reason}`,
     );
+  };
+
+  private static isAlreadyKnownError = (error: unknown): boolean => {
+    const msg = formatError(error).toLowerCase();
+    return msg.includes('already known') || msg.includes('alreadyknown');
   };
 }
 
