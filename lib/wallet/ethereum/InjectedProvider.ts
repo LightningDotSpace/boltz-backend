@@ -380,7 +380,7 @@ class InjectedProvider implements Provider {
       provider.broadcastTransaction(signedTransaction),
     );
 
-    this.broadcastToPublicRpcs(signedTransaction, tx.hash!);
+    await this.broadcastToPublicRpcs(signedTransaction, tx.hash!).catch(() => {});
 
     const settled = await Promise.allSettled(promises);
     const results = settled
@@ -614,32 +614,33 @@ class InjectedProvider implements Provider {
     });
   };
 
-  private broadcastToPublicRpcs = (
+  private broadcastToPublicRpcs = async (
     signedTransaction: string,
     txHash: string,
-  ): void => {
+  ): Promise<void> => {
     if (this.publicBroadcastRpcs.length === 0) return;
 
     this.logger.verbose(
       `Broadcasting ${this.networkDetails.name} tx ${txHash} to ${this.publicBroadcastRpcs.length} public RPCs`,
     );
 
-    for (const rpcUrl of this.publicBroadcastRpcs) {
-      const provider = new JsonRpcProvider(rpcUrl);
-      provider
-        .broadcastTransaction(signedTransaction)
-        .then(() => {
+    await Promise.allSettled(
+      this.publicBroadcastRpcs.map(async (rpcUrl) => {
+        const provider = new JsonRpcProvider(rpcUrl);
+        try {
+          await provider.broadcastTransaction(signedTransaction);
           this.logger.info(
             `Public RPC broadcast success for ${txHash}: ${rpcUrl}`,
           );
-        })
-        .catch((error) => {
+        } catch (error) {
           this.logger.warn(
             `Public RPC broadcast failed for ${txHash} via ${rpcUrl}: ${formatError(error)}`,
           );
-        })
-        .finally(() => provider.destroy());
-    }
+        } finally {
+          provider.destroy();
+        }
+      }),
+    );
   };
 
   private addToTransactionDatabase = async (tx: Transaction) => {
