@@ -307,6 +307,20 @@ class InjectedProvider implements Provider {
       );
 
       if (inMempool === null) {
+        const receipt = await this.forwardMethodNullable(
+          'getTransactionReceipt',
+          tx.hash,
+        );
+
+        if (receipt !== null) {
+          this.logger.info(
+            `Removing confirmed ${this.networkDetails.name} transaction: ${tx.hash} (nonce ${tx.nonce})`,
+          );
+          await tx.destroy();
+          nextNonce++;
+          continue;
+        }
+
         let decoded: Record<string, unknown> = {};
         try {
           const parsed = Transaction.from(tx.hex);
@@ -328,7 +342,6 @@ class InjectedProvider implements Provider {
           decoded = { decodeError: formatError(error) };
         }
 
-        // Transaction was dropped from mempool, reuse this nonce
         this.logger.warn(
           `${this.networkDetails.name} transaction dropped from mempool, reusing nonce ${tx.nonce}: ${stringify(
             {
