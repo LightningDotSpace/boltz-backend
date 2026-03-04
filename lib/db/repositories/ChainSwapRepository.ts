@@ -340,6 +340,13 @@ class ChainSwapRepository {
       return swap;
     });
 
+  public static setPreimage = async (swap: ChainSwapInfo, preimage: Buffer) => {
+    swap.chainSwap = await swap.chainSwap.update({
+      preimage: getHexString(preimage),
+    });
+    return swap;
+  };
+
   public static setTransactionClaimPending = async (
     swap: ChainSwapInfo,
     preimage: Buffer,

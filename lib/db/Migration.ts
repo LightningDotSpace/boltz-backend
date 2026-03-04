@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 34;
+  private static latestSchemaVersion = 35;
 
   private toBackFill: number[] = [];
 
@@ -1514,6 +1514,46 @@ class Migration {
         );
 
         this.logger.info(`Marked ${updated} stuck chain swaps as claimed`);
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      case 34: {
+        this.logger.info('Marking stuck chain swaps as failed');
+
+        const stuckSwapIds = [
+          'yc5LEnGzX6v1',
+          'cyeLpcyLveXD',
+          'YTwDFt5DnbUJ',
+          'kWuk1D5JmyGo',
+          'BZL3qIIJnnDH',
+          '8uSyuoAByY2A',
+          'tu89LUkk5XVL',
+          'bAK9dgZLxadK',
+          'FZhSHIxVfWYM',
+          'ZhdruRvP34Ev',
+          '3qY3NYk3hp5M',
+          'ZpggDZaKpAh9',
+          'zuI71gytKWUt',
+        ];
+
+        const [, updated] = await this.sequelize.query(
+          `UPDATE "chainSwaps" SET status = $1, "failureReason" = $2, "updatedAt" = NOW() WHERE id = ANY($3::text[]) AND status NOT IN ($4, $5, $6)`,
+          {
+            bind: [
+              SwapUpdateEvent.TransactionFailed,
+              'swap stuck in unrecoverable state',
+              stuckSwapIds,
+              SwapUpdateEvent.TransactionClaimed,
+              SwapUpdateEvent.TransactionRefunded,
+              SwapUpdateEvent.SwapExpired,
+            ],
+            type: QueryTypes.UPDATE,
+          },
+        );
+
+        this.logger.info(`Marked ${updated} stuck chain swaps as failed`);
 
         await this.finishMigration(versionRow.version, currencies);
         break;

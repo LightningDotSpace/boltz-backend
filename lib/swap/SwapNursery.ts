@@ -1114,6 +1114,7 @@ class SwapNursery extends TypedEventEmitter<SwapNurseryEvents> {
               );
             } else {
               const chainSwap = swap as ChainSwapInfo;
+              await ChainSwapRepository.setPreimage(chainSwap, preimage);
               await this.attemptSettleSwap(
                 this.currencies.get(chainSwap.receivingData.symbol)!,
                 chainSwap,
