@@ -12,13 +12,13 @@ import type {
   ProviderEvent,
   TransactionReceipt,
   TransactionRequest,
-  TransactionResponse,
 } from 'ethers';
 import {
   AlchemyProvider,
   InfuraProvider,
   JsonRpcProvider,
   Transaction,
+  TransactionResponse,
 } from 'ethers';
 import type {
   EthProviderServiceConfig,
@@ -436,11 +436,11 @@ class InjectedProvider implements Provider {
       (res): res is PromiseRejectedResult => res.status === 'rejected',
     );
 
-    const allAlreadyKnown = rejected.every((res) =>
+    const hasAlreadyKnown = rejected.some((res) =>
       InjectedProvider.isAlreadyKnownError(res.reason),
     );
-
-    if (allAlreadyKnown && tx.hash) {
+    
+    if (hasAlreadyKnown && tx.hash) {
       this.logger.info(
         `${this.networkDetails.name} transaction ${tx.hash} already in mempool, treating as success`,
       );
@@ -449,6 +449,10 @@ class InjectedProvider implements Provider {
       if (existing) {
         return existing;
       }
+
+      this.logger.info(`Returning existing transaction ${tx.hash} from provider ${this.providers.values().next().value!.constructor.name}`);
+      const provider = this.providers.values().next().value!;
+      return new TransactionResponse(tx as any, provider);
     }
 
     const error = (settled[0] as PromiseRejectedResult).reason;
