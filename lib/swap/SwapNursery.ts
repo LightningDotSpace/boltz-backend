@@ -1348,6 +1348,35 @@ class SwapNursery extends TypedEventEmitter<SwapNurseryEvents> {
         );
       }
 
+      // StablecoinBridge conversion: convert JUSD → USDT.e before locking
+      const bridge = nursery.ethereumManager.stablecoinBridge;
+
+      if (
+        bridge &&
+        wallet.symbol === nursery.ethereumManager.stablecoinBridgeUsdteSymbol
+      ) {
+        const tokenAmount = walletProvider.formatTokenAmount(
+          lockupDetails.expectedAmount,
+        );
+        // JUSD has 18 decimals, USDT.e has 6 decimals
+        // StablecoinBridge.burn() expects the JUSD amount in 18-decimal format
+        const jusdAmount = tokenAmount * 10n ** BigInt(18 - 6);
+
+        this.logger.info(
+          `StablecoinBridge: converting ${jusdAmount} JUSD (18-dec) → ${tokenAmount} USDT.e (6-dec) for ${swapTypeToPrettyString(swap.type)} Swap ${swap.id}`,
+        );
+
+        const bridgeTx = await bridge.burnJusdToUsdte(
+          jusdAmount,
+          `Bridge burn for ${swapTypeToPrettyString(swap.type)} Swap ${swap.id}`,
+        );
+        await bridgeTx.wait(1);
+
+        this.logger.info(
+          `StablecoinBridge burn confirmed: ${bridgeTx.hash}`,
+        );
+      }
+
       let contractTransaction: ContractTransactionResponse;
 
       if (
