@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 36;
+  private static latestSchemaVersion = 37;
 
   private toBackFill: number[] = [];
 
@@ -1568,6 +1568,29 @@ class Migration {
             bind: [
               SwapUpdateEvent.TransactionClaimed,
               'z7wYXUZhfW2J',
+              SwapUpdateEvent.TransactionClaimed,
+              SwapUpdateEvent.TransactionRefunded,
+              SwapUpdateEvent.SwapExpired,
+            ],
+            type: QueryTypes.UPDATE,
+          },
+        );
+
+        this.logger.info(`Marked ${updated} stuck chain swap as claimed`);
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      case 36: {
+        this.logger.info('Marking stuck chain swap qB1peqbE9ZJh as claimed');
+
+        const [, updated] = await this.sequelize.query(
+          `UPDATE "chainSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = $2 AND status NOT IN ($3, $4, $5)`,
+          {
+            bind: [
+              SwapUpdateEvent.TransactionClaimed,
+              'qB1peqbE9ZJh',
               SwapUpdateEvent.TransactionClaimed,
               SwapUpdateEvent.TransactionRefunded,
               SwapUpdateEvent.SwapExpired,
