@@ -149,9 +149,9 @@ class SwapNursery extends TypedEventEmitter<SwapNurseryEvents> {
     private readonly chainSwapSigner: ChainSwapSigner,
     lockupTransactionTracker: LockupTransactionTracker,
     balanceCheck: BalanceCheck,
-    overPaymentConfig?: OverPaymentConfig,
-    paymentTimeoutMinutes?: number,
-    chainSwapAutoRenegotiate: boolean = false,
+    overPaymentConfig: OverPaymentConfig | undefined,
+    paymentTimeoutMinutes: number | undefined,
+    chainSwapAutoRenegotiate: boolean,
   ) {
     super();
 

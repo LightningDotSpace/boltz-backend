@@ -187,7 +187,7 @@ type SwapConfig = {
 
   paymentTimeoutMinutes?: number;
 
-  chainSwapAutoRenegotiate?: boolean;
+  chainSwapAutoRenegotiate: boolean;
 };
 
 type ConfigType = {
