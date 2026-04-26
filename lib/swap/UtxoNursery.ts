@@ -43,6 +43,7 @@ import type Sidecar from '../sidecar/Sidecar';
 import type Wallet from '../wallet/Wallet';
 import type { Currency } from '../wallet/WalletManager';
 import type WalletManager from '../wallet/WalletManager';
+import type ChainSwapAutoAdjuster from './ChainSwapAutoAdjuster';
 import Errors from './Errors';
 import type OverpaymentProtector from './OverpaymentProtector';
 import { Action } from './hooks/CreationHook';
@@ -107,6 +108,7 @@ class UtxoNursery extends TypedEventEmitter<{
     private readonly lockupTransactionTracker: LockupTransactionTracker,
     private readonly transactionHook: TransactionHook,
     private readonly overpaymentProtector: OverpaymentProtector,
+    private readonly chainSwapAutoAdjuster: ChainSwapAutoAdjuster,
   ) {
     super();
   }
@@ -157,41 +159,57 @@ class UtxoNursery extends TypedEventEmitter<{
     );
 
     if (swap.receivingData.expectedAmount > outputValue) {
-      let reason: string;
-
       if (outputValue === 0) {
-        reason = Errors.INCORRECT_ASSET_SENT().message;
-      } else {
-        reason = Errors.INSUFFICIENT_AMOUNT(
-          outputValue,
-          swap.receivingData.expectedAmount,
-        ).message;
+        this.emit('chainSwap.lockup.failed', {
+          swap,
+          reason: Errors.INCORRECT_ASSET_SENT().message,
+        });
+        return;
       }
 
-      this.emit('chainSwap.lockup.failed', {
+      const adjustResult = await this.chainSwapAutoAdjuster.attemptAdjust(
         swap,
-        reason,
-      });
-
-      return;
-    }
-
-    if (
+        outputValue,
+      );
+      if (!adjustResult.adjusted) {
+        this.logger.debug(
+          `Chain Swap ${swap.id} underpay auto-adjust skipped: ${adjustResult.reason}`,
+        );
+        this.emit('chainSwap.lockup.failed', {
+          swap,
+          reason: Errors.INSUFFICIENT_AMOUNT(
+            outputValue,
+            swap.receivingData.expectedAmount,
+          ).message,
+        });
+        return;
+      }
+      swap = (await ChainSwapRepository.getChainSwap({ id: swap.id }))!;
+    } else if (
       this.overpaymentProtector.isUnacceptableOverpay(
         swap.type,
         swap.receivingData.expectedAmount,
         outputValue,
       )
     ) {
-      this.emit('chainSwap.lockup.failed', {
+      const adjustResult = await this.chainSwapAutoAdjuster.attemptAdjust(
         swap,
-        reason: Errors.OVERPAID_AMOUNT(
-          outputValue,
-          swap.receivingData.expectedAmount,
-        ).message,
-      });
-
-      return;
+        outputValue,
+      );
+      if (!adjustResult.adjusted) {
+        this.logger.debug(
+          `Chain Swap ${swap.id} overpay auto-adjust skipped: ${adjustResult.reason}`,
+        );
+        this.emit('chainSwap.lockup.failed', {
+          swap,
+          reason: Errors.OVERPAID_AMOUNT(
+            outputValue,
+            swap.receivingData.expectedAmount,
+          ).message,
+        });
+        return;
+      }
+      swap = (await ChainSwapRepository.getChainSwap({ id: swap.id }))!;
     }
 
     {

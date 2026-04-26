@@ -68,6 +68,7 @@ import type NotificationClient from '../notifications/NotificationClient';
 import FeeProvider from '../rates/FeeProvider';
 import type LockupTransactionTracker from '../rates/LockupTransactionTracker';
 import type RateProvider from '../rates/RateProvider';
+import type BalanceCheck from '../service/BalanceCheck';
 import type TimeoutDeltaProvider from '../service/TimeoutDeltaProvider';
 import type ChainSwapSigner from '../service/cooperative/ChainSwapSigner';
 import type DeferredClaimer from '../service/cooperative/DeferredClaimer';
@@ -83,6 +84,7 @@ import {
 } from '../wallet/ethereum/contracts/ContractUtils';
 import type Contracts from '../wallet/ethereum/contracts/Contracts';
 import type ERC20WalletProvider from '../wallet/providers/ERC20WalletProvider';
+import ChainSwapAutoAdjuster from './ChainSwapAutoAdjuster';
 import ChannelNursery from './ChannelNursery';
 import Errors from './Errors';
 import EthereumNursery from './EthereumNursery';
@@ -146,8 +148,10 @@ class SwapNursery extends TypedEventEmitter<SwapNurseryEvents> {
     private readonly claimer: DeferredClaimer,
     private readonly chainSwapSigner: ChainSwapSigner,
     lockupTransactionTracker: LockupTransactionTracker,
+    balanceCheck: BalanceCheck,
     overPaymentConfig?: OverPaymentConfig,
     paymentTimeoutMinutes?: number,
+    chainSwapAutoRenegotiate: boolean = false,
   ) {
     super();
 
@@ -159,6 +163,16 @@ class SwapNursery extends TypedEventEmitter<SwapNurseryEvents> {
       this.logger,
       overPaymentConfig,
     );
+    const chainSwapAutoAdjuster = new ChainSwapAutoAdjuster(
+      this.logger,
+      this.currencies,
+      this.rateProvider,
+      balanceCheck,
+      chainSwapAutoRenegotiate,
+    );
+    this.logger.info(
+      `Chain Swap auto-renegotiate: ${chainSwapAutoRenegotiate ? 'enabled' : 'disabled'}`,
+    );
     this.utxoNursery = new UtxoNursery(
       this.logger,
       this.sidecar,
@@ -166,6 +180,7 @@ class SwapNursery extends TypedEventEmitter<SwapNurseryEvents> {
       lockupTransactionTracker,
       this.transactionHook,
       overpaymentProtector,
+      chainSwapAutoAdjuster,
     );
     this.invoiceNursery = new InvoiceNursery(this.logger, this.sidecar);
     this.channelNursery = new ChannelNursery(
@@ -181,6 +196,7 @@ class SwapNursery extends TypedEventEmitter<SwapNurseryEvents> {
           manager,
           this.transactionHook,
           overpaymentProtector,
+          chainSwapAutoAdjuster,
         ),
     );
 

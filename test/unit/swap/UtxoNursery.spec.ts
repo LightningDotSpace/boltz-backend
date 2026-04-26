@@ -183,6 +183,12 @@ describe('UtxoNursery', () => {
     isAcceptable: jest.fn().mockResolvedValue(true),
   } as unknown as LockupTransactionTracker;
 
+  const autoAdjuster = {
+    isEnabled: jest.fn().mockReturnValue(false),
+    attemptAdjust: jest
+      .fn()
+      .mockResolvedValue({ adjusted: false, reason: 'disabled' }),
+  } as any;
   const nursery = new UtxoNursery(
     Logger.disabledLogger,
     { on: jest.fn() } as any,
@@ -192,6 +198,7 @@ describe('UtxoNursery', () => {
     lockupTracker,
     transactionHook,
     new OverpaymentProtector(Logger.disabledLogger),
+    autoAdjuster,
   );
 
   beforeAll(async () => {
@@ -1251,5 +1258,90 @@ describe('UtxoNursery', () => {
         getOutputValueSpy.mockRestore();
       },
     );
+
+    test('emits chainSwap.lockup when auto-adjust succeeds for overpay', async () => {
+      const checkChainSwapTransaction = nursery['checkChainSwapTransaction'];
+
+      const ourKeys = ECPair.makeRandom();
+      const theirPublicKey = Buffer.from(ECPair.makeRandom().publicKey);
+
+      const tree = swapTree(
+        false,
+        randomBytes(32),
+        Buffer.from(ourKeys.publicKey),
+        theirPublicKey,
+        210,
+      );
+
+      const transaction = new Transaction();
+      transaction.addOutput(
+        Scripts.p2trOutput(
+          tweakMusig(
+            CurrencyType.BitcoinLike,
+            createMusig(ourKeys, theirPublicKey),
+            tree,
+          ),
+        ),
+        20_001,
+      );
+
+      mockGetKeysByIndexResult = ourKeys;
+
+      const mockChainSwap = {
+        id: 'autoAdjustSwap',
+        type: SwapType.Chain,
+        receivingData: {
+          keyIndex: 1,
+          expectedAmount: 20_000,
+          theirPublicKey: theirPublicKey.toString('hex'),
+          swapTree: JSON.stringify(SwapTreeSerializer.serializeSwapTree(tree)),
+        },
+      };
+
+      ChainSwapRepository.setUserLockupTransaction = jest
+        .fn()
+        .mockResolvedValue(mockChainSwap);
+      ChainSwapRepository.getChainSwap = jest.fn().mockResolvedValue({
+        ...mockChainSwap,
+        receivingData: {
+          ...mockChainSwap.receivingData,
+          expectedAmount: 20_001,
+        },
+      });
+
+      const getOutputValueSpy = jest
+        .spyOn(Core, 'getOutputValue')
+        .mockReturnValue(20_001);
+
+      autoAdjuster.attemptAdjust = jest
+        .fn()
+        .mockResolvedValue({ adjusted: true });
+
+      let lockupEmitted = false;
+      let failureEmitted = false;
+      nursery.once('chainSwap.lockup', () => {
+        lockupEmitted = true;
+      });
+      nursery.once('chainSwap.lockup.failed', () => {
+        failureEmitted = true;
+      });
+
+      await checkChainSwapTransaction(
+        mockChainSwap as any,
+        btcChainClient,
+        btcWallet,
+        transaction,
+        true,
+      );
+
+      expect(autoAdjuster.attemptAdjust).toHaveBeenCalledWith(
+        mockChainSwap,
+        20_001,
+      );
+      expect(lockupEmitted).toEqual(true);
+      expect(failureEmitted).toEqual(false);
+
+      getOutputValueSpy.mockRestore();
+    });
   });
 });

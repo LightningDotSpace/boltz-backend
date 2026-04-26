@@ -136,7 +136,7 @@ jest.mock('../../../lib/wallet/ethereum/EthereumManager', () => {
     networkDetails: Ethereum,
     tokenAddresses: new Map([['USDT', mockTokenAddress]]),
     provider: {
-      on: mockOnProvider
+      on: mockOnProvider,
       getTransaction: mockGetTransaction,
     },
     contractEventHandler: {
@@ -213,6 +213,12 @@ describe('EthereumNursery', () => {
     hook: jest.fn().mockReturnValue(true),
   } as unknown as TransactionHook;
 
+  const autoAdjuster = {
+    isEnabled: jest.fn().mockReturnValue(false),
+    attemptAdjust: jest
+      .fn()
+      .mockResolvedValue({ adjusted: false, reason: 'disabled' }),
+  } as any;
   const nursery = new EthereumNursery(
     Logger.disabledLogger,
     {
@@ -225,6 +231,7 @@ describe('EthereumNursery', () => {
     new MockedEthereumManager(),
     transactionHook,
     new OverpaymentProtector(Logger.disabledLogger),
+    autoAdjuster,
   );
 
   beforeEach(() => {

@@ -30,6 +30,7 @@ import type Wallet from '../wallet/Wallet';
 import type WalletManager from '../wallet/WalletManager';
 import type EthereumManager from '../wallet/ethereum/EthereumManager';
 import type ERC20WalletProvider from '../wallet/providers/ERC20WalletProvider';
+import type ChainSwapAutoAdjuster from './ChainSwapAutoAdjuster';
 import Errors from './Errors';
 import type OverpaymentProtector from './OverpaymentProtector';
 import { Action } from './hooks/CreationHook';
@@ -72,6 +73,7 @@ class EthereumNursery extends TypedEventEmitter<{
     public readonly ethereumManager: EthereumManager,
     private readonly transactionHook: TransactionHook,
     private readonly overpaymentProtector: OverpaymentProtector,
+    private readonly chainSwapAutoAdjuster: ChainSwapAutoAdjuster,
   ) {
     super();
 
@@ -233,31 +235,34 @@ class EthereumNursery extends TypedEventEmitter<{
     if (expectedAmount) {
       const actualAmountSat = Number(etherSwapValues.amount / etherDecimals);
 
-      if (
+      const isUnderpay =
         BigInt(expectedAmount) * this.ethereumManager.networkDetails.decimals >
-        etherSwapValues.amount
-      ) {
-        this.emit('lockup.failed', {
-          swap,
-          reason: Errors.INSUFFICIENT_AMOUNT(actualAmountSat, expectedAmount)
-            .message,
-        });
-        return;
-      }
-
-      if (
+        etherSwapValues.amount;
+      const isOverpay =
+        !isUnderpay &&
         this.overpaymentProtector.isUnacceptableOverpay(
           swap.type,
           expectedAmount,
           actualAmountSat,
-        )
-      ) {
-        this.emit('lockup.failed', {
+        );
+
+      if (isUnderpay || isOverpay) {
+        const adjusted = await this.tryAutoAdjust(
           swap,
-          reason: Errors.OVERPAID_AMOUNT(actualAmountSat, expectedAmount)
-            .message,
-        });
-        return;
+          actualAmountSat,
+          expectedAmount,
+        );
+        if (!adjusted) {
+          this.emit('lockup.failed', {
+            swap,
+            reason: (isUnderpay
+              ? Errors.INSUFFICIENT_AMOUNT(actualAmountSat, expectedAmount)
+              : Errors.OVERPAID_AMOUNT(actualAmountSat, expectedAmount)
+            ).message,
+          });
+          return;
+        }
+        swap = adjusted;
       }
     }
 
@@ -375,29 +380,33 @@ class EthereumNursery extends TypedEventEmitter<{
         erc20SwapValues.amount,
       );
 
-      if (
-        erc20Wallet.formatTokenAmount(expectedAmount) > erc20SwapValues.amount
-      ) {
-        this.emit('lockup.failed', {
-          swap,
-          reason: Errors.INSUFFICIENT_AMOUNT(actualAmount, expectedAmount)
-            .message,
-        });
-        return;
-      }
-
-      if (
+      const isUnderpay =
+        erc20Wallet.formatTokenAmount(expectedAmount) > erc20SwapValues.amount;
+      const isOverpay =
+        !isUnderpay &&
         this.overpaymentProtector.isUnacceptableOverpay(
           swap.type,
           expectedAmount,
           actualAmount,
-        )
-      ) {
-        this.emit('lockup.failed', {
+        );
+
+      if (isUnderpay || isOverpay) {
+        const adjusted = await this.tryAutoAdjust(
           swap,
-          reason: Errors.OVERPAID_AMOUNT(actualAmount, expectedAmount).message,
-        });
-        return;
+          actualAmount,
+          expectedAmount,
+        );
+        if (!adjusted) {
+          this.emit('lockup.failed', {
+            swap,
+            reason: (isUnderpay
+              ? Errors.INSUFFICIENT_AMOUNT(actualAmount, expectedAmount)
+              : Errors.OVERPAID_AMOUNT(actualAmount, expectedAmount)
+            ).message,
+          });
+          return;
+        }
+        swap = adjusted;
       }
     }
 
@@ -636,6 +645,28 @@ class EthereumNursery extends TypedEventEmitter<{
     }
   };
 
+  private tryAutoAdjust = async (
+    swap: Swap | ChainSwapInfo,
+    actualAmount: number,
+    expectedAmount: number,
+  ): Promise<ChainSwapInfo | null> => {
+    if (swap.type !== SwapType.Chain) {
+      return null;
+    }
+    const chainSwap = swap as ChainSwapInfo;
+    const result = await this.chainSwapAutoAdjuster.attemptAdjust(
+      chainSwap,
+      actualAmount,
+    );
+    if (!result.adjusted) {
+      this.logger.debug(
+        `Chain Swap ${chainSwap.id} EVM auto-adjust skipped (expected ${expectedAmount}, actual ${actualAmount}): ${result.reason}`,
+      );
+      return null;
+    }
+    return await ChainSwapRepository.getChainSwap({ id: chainSwap.id });
+  };
+
   private getSwapReceivingCurrency = (swap: Swap | ChainSwapInfo) => {
     if (swap.type === SwapType.Submarine) {
       const { base, quote } = splitPairId(swap.pair);
@@ -660,9 +691,11 @@ class EthereumNursery extends TypedEventEmitter<{
       return;
     }
 
-    if ((wallet.symbol === this.ethereumManager.networkDetails.symbol ||
-          this.ethereumManager.tokenAddresses?.has(wallet.symbol)) &&
-        [CurrencyType.Ether, CurrencyType.ERC20].includes(wallet.type)) {
+    if (
+      (wallet.symbol === this.ethereumManager.networkDetails.symbol ||
+        this.ethereumManager.tokenAddresses?.has(wallet.symbol)) &&
+      [CurrencyType.Ether, CurrencyType.ERC20].includes(wallet.type)
+    ) {
       return wallet;
     }
 

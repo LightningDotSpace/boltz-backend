@@ -186,6 +186,8 @@ type SwapConfig = {
   overpayment?: OverPaymentConfig;
 
   paymentTimeoutMinutes?: number;
+
+  chainSwapAutoRenegotiate?: boolean;
 };
 
 type ConfigType = {
