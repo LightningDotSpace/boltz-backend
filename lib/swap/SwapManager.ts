@@ -235,7 +235,7 @@ class SwapManager {
       balanceCheck,
       swapConfig.overpayment,
       swapConfig.paymentTimeoutMinutes,
-      swapConfig.chainSwapAutoRenegotiate ?? false,
+      true,
     );
 
     this.renegotiator = new Renegotiator(
