@@ -6,19 +6,16 @@ on:
   workflow_dispatch:
 
 env:
-  DOCKER_TAGS: dfxswiss/boltz-backend:dev
-  AZURE_RESOURCE_GROUP: rg-lds-api-dev
-  AZURE_VM_NAME: vm-lds-btc-dev
+  DOCKER_TAGS: lightningdotspacecom/boltz-backend:beta
   NODE_VERSION: 22.14.0
   NODE_ENVIRONMENT: dev
 
 jobs:
-  build-and-deploy:
-    name: Build, test and deploy to DEV
+  build-and-push:
+    name: Build & push (linux/arm64)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,6 +28,11 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Set up QEMU (arm64)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -39,32 +41,10 @@ jobs:
         with:
           file: docker/boltz/Dockerfile
           context: .
+          platforms: linux/arm64
           push: true
           tags: ${{ env.DOCKER_TAGS }}
+          provenance: false
           build-args: |
             NODE_VERSION=${{ env.NODE_VERSION }}
             NODE_ENVIRONMENT=${{ env.NODE_ENVIRONMENT }}
-
-      - name: Log in to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.LDS_DEV_CREDENTIALS }}
-
-      - name: Update Azure VM docker container
-        uses: azure/CLI@v2
-        with:
-          inlineScript: |
-            echo "Update docker container..."
-
-            CONTENT=$(base64 -w0 ./config/dev-template-boltz.conf)
-
-            az vm run-command invoke \
-              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-              --name ${{ env.AZURE_VM_NAME }} \
-              --command-id RunShellScript \
-              --scripts "echo $CONTENT | base64 -d > /home/lds/volumes/boltz/backend/boltz.conf.template && /home/lds/update-boltz.sh backend"
-
-      - name: Logout from Azure
-        if: always()
-        run: |
-          az logout
