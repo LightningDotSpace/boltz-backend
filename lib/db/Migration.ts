@@ -136,7 +136,7 @@ export const decodeBip21 = (
 
 // TODO: integration tests for actual migrations
 class Migration {
-  private static latestSchemaVersion = 37;
+  private static latestSchemaVersion = 38;
 
   private toBackFill: number[] = [];
 
@@ -1600,6 +1600,60 @@ class Migration {
         );
 
         this.logger.info(`Marked ${updated} stuck chain swap as claimed`);
+
+        await this.finishMigration(versionRow.version, currencies);
+        break;
+      }
+
+      case 37: {
+        this.logger.info('Marking stuck chain swaps as claimed');
+
+        const stuckClaimedChainSwapIds = [
+          '9uSLNoSNhryc',
+          'kJdmPpAXcUF4',
+          'PaPxDPp7D3NQ',
+          'Hh66UVhgMgWI',
+        ];
+
+        const [, updatedChain] = await this.sequelize.query(
+          `UPDATE "chainSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = ANY($2::text[]) AND status NOT IN ($3, $4, $5)`,
+          {
+            bind: [
+              SwapUpdateEvent.TransactionClaimed,
+              stuckClaimedChainSwapIds,
+              SwapUpdateEvent.TransactionClaimed,
+              SwapUpdateEvent.TransactionRefunded,
+              SwapUpdateEvent.SwapExpired,
+            ],
+            type: QueryTypes.UPDATE,
+          },
+        );
+
+        this.logger.info(`Marked ${updatedChain} stuck chain swaps as claimed`);
+
+        this.logger.info('Marking stuck reverse swaps as invoice settled');
+
+        const stuckSettledReverseSwapIds = [
+          'nXe2yIeex7ry',
+          '1HhHVhP7Q4W5',
+        ];
+
+        const [, updatedReverse] = await this.sequelize.query(
+          `UPDATE "reverseSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = ANY($2::text[]) AND status NOT IN ($3, $4, $5, $6)`,
+          {
+            bind: [
+              SwapUpdateEvent.InvoiceSettled,
+              stuckSettledReverseSwapIds,
+              SwapUpdateEvent.InvoiceSettled,
+              SwapUpdateEvent.TransactionRefunded,
+              SwapUpdateEvent.TransactionFailed,
+              SwapUpdateEvent.SwapExpired,
+            ],
+            type: QueryTypes.UPDATE,
+          },
+        );
+
+        this.logger.info(`Marked ${updatedReverse} stuck reverse swaps as invoice settled`);
 
         await this.finishMigration(versionRow.version, currencies);
         break;
