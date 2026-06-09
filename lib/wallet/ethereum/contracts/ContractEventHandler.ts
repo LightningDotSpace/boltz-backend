@@ -56,6 +56,12 @@ class ContractEventHandler extends TypedEventEmitter<Events> {
   // Check for missed events every 5 minutes
   private static readonly missedEventsCheckInterval = 1_000 * 60 * 5;
 
+  // Number of consecutive transient rescan failures after which we stop
+  // treating them as transient noise and escalate to ERROR. A brief blip
+  // recovers within an interval or two; failing this many intervals in a row
+  // is a sustained RPC outage that must stay visible.
+  private static readonly maxTransientRescanFailures = 3;
+
   // Max block range per eth_getLogs query (Citrea RPC rejects ranges >= 1000)
   private static readonly maxBlockRangePerQuery = 999;
 
@@ -70,6 +76,7 @@ class ContractEventHandler extends TypedEventEmitter<Events> {
 
   private rescanLastHeight = 0;
   private rescanInterval: NodeJS.Timeout | undefined;
+  private rescanFailureCount = 0;
 
   constructor(private readonly logger: Logger) {
     super();
@@ -98,14 +105,23 @@ class ContractEventHandler extends TypedEventEmitter<Events> {
     this.rescanInterval = setInterval(async () => {
       try {
         await this.checkMissedEvents(provider);
+        this.rescanFailureCount = 0;
       } catch (error) {
+        this.rescanFailureCount++;
+
         // Transient RPC failures (e.g. a Citrea provider briefly behind the
         // chain head) are expected and recovered on the next interval, so we
-        // log them at WARN without advancing the scan height. Genuine,
-        // unexpected errors are still surfaced at ERROR.
-        const level = isTransientRpcError(error) ? 'warn' : 'error';
+        // log them at WARN without advancing the scan height. But a *persistent*
+        // failure is no longer transient noise: once the rescan has failed for
+        // several consecutive intervals we escalate to ERROR so a genuine,
+        // sustained RPC outage stays visible. Unexpected errors go to ERROR
+        // immediately.
+        const sustained =
+          this.rescanFailureCount >=
+          ContractEventHandler.maxTransientRescanFailures;
+        const level = isTransientRpcError(error) && !sustained ? 'warn' : 'error';
         this.logger[level](
-          `Error checking for missed events of ${this.networkDetails.name} contracts v${version}, will retry next interval: ${formatError(error)}`,
+          `Error checking for missed events of ${this.networkDetails.name} contracts v${version} (attempt ${this.rescanFailureCount}), will retry next interval: ${formatError(error)}`,
         );
       }
     }, ContractEventHandler.missedEventsCheckInterval);
