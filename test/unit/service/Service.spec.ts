@@ -3359,6 +3359,36 @@ describe('Service', () => {
     ).resolves.toEqual(mockGetFeeDataResult.maxFeePerGas);
   });
 
+  test('should serve cached gas price when fetch fails within TTL', async () => {
+    const provider = currencies.get('ETH')!.provider!;
+
+    mockGetFeeDataResult.gasPrice = BigInt(10) * gweiDecimals;
+    mockGetFeeDataResult.maxFeePerGas = undefined;
+    const cached = await service['getGasPrice'](provider);
+
+    mockGetFeeData.mockRejectedValueOnce(new Error('timeout'));
+    await expect(service['getGasPrice'](provider)).resolves.toEqual(cached);
+  });
+
+  test('should rethrow gas price error when cache is older than the TTL', async () => {
+    const provider = currencies.get('ETH')!.provider!;
+
+    mockGetFeeDataResult.gasPrice = BigInt(10) * gweiDecimals;
+    mockGetFeeDataResult.maxFeePerGas = undefined;
+    await service['getGasPrice'](provider);
+
+    const nowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(Date.now() + Service['GasPriceCacheTtl'] + 1);
+
+    try {
+      mockGetFeeData.mockRejectedValueOnce(new Error('timeout'));
+      await expect(service['getGasPrice'](provider)).rejects.toThrow('timeout');
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   test('should get referral IDs', async () => {
     const getReferralId = service['getReferralId'];
 
