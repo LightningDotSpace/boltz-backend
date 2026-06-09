@@ -10,7 +10,7 @@ import type Logger from '../../../Logger';
 import { formatError } from '../../../Utils';
 import TypedEventEmitter from '../../../consts/TypedEventEmitter';
 import type { ERC20SwapValues, EtherSwapValues } from '../../../consts/Types';
-import { parseBuffer } from '../EthereumUtils';
+import { isTransientRpcError, parseBuffer } from '../EthereumUtils';
 import type { NetworkDetails } from '../EvmNetworks';
 import { formatERC20SwapValues, formatEtherSwapValues } from './ContractUtils';
 
@@ -99,8 +99,13 @@ class ContractEventHandler extends TypedEventEmitter<Events> {
       try {
         await this.checkMissedEvents(provider);
       } catch (error) {
-        this.logger.error(
-          `Error checking for missed events of ${this.networkDetails.name} contracts v${version}: ${formatError(error)}`,
+        // Transient RPC failures (e.g. a Citrea provider briefly behind the
+        // chain head) are expected and recovered on the next interval, so we
+        // log them at WARN without advancing the scan height. Genuine,
+        // unexpected errors are still surfaced at ERROR.
+        const level = isTransientRpcError(error) ? 'warn' : 'error';
+        this.logger[level](
+          `Error checking for missed events of ${this.networkDetails.name} contracts v${version}, will retry next interval: ${formatError(error)}`,
         );
       }
     }, ContractEventHandler.missedEventsCheckInterval);
@@ -117,8 +122,7 @@ class ContractEventHandler extends TypedEventEmitter<Events> {
     startHeight: number,
     endHeight?: number,
   ): Promise<void> => {
-    const actualEndHeight =
-      endHeight ?? (await this.provider.getBlockNumber());
+    const actualEndHeight = endHeight ?? (await this.provider.getBlockNumber());
     const range = actualEndHeight - startHeight;
 
     // If range exceeds limit, split into chunks

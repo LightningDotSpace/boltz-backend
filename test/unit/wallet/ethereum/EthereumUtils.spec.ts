@@ -2,6 +2,7 @@ import type { Provider } from 'ethers';
 import { getHexBuffer } from '../../../../lib/Utils';
 import {
   getGasPrices,
+  isTransientRpcError,
   parseBuffer,
 } from '../../../../lib/wallet/ethereum/EthereumUtils';
 
@@ -42,5 +43,21 @@ describe('EthereumUtils', () => {
     expect(await getGasPrices(provider)).toEqual(expected);
 
     expect(mockGetFeeData).toHaveBeenCalledTimes(1);
+  });
+
+  test.each`
+    name                              | error                                                                                                                     | expected
+    ${'block range beyond head'}      | ${new Error('could not coalesce error (error={ "code": -32000, "message": "block range extends beyond current head" })')} | ${true}
+    ${'plain block range message'}    | ${'block range extends beyond current finalized block'}                                                                   | ${true}
+    ${'coalesce error'}               | ${new Error('could not coalesce error')}                                                                                  | ${true}
+    ${'all providers failed'}         | ${new Error('requests to all providers failed:\n - timeout')}                                                             | ${true}
+    ${'boltz providers error object'} | ${{ message: 'requests to all providers failed:\n - timeout', code: 'ETH.4' }}                                            | ${true}
+    ${'uppercase message'}            | ${new Error('Could Not Coalesce Error')}                                                                                  | ${true}
+    ${'genuine error'}                | ${new Error('execution reverted: bad swap')}                                                                              | ${false}
+    ${'nonce too low'}                | ${new Error('nonce too low')}                                                                                             | ${false}
+    ${'undefined'}                    | ${undefined}                                                                                                              | ${false}
+    ${'random string'}                | ${'something went wrong'}                                                                                                 | ${false}
+  `('should classify transient RPC error: $name', ({ error, expected }) => {
+    expect(isTransientRpcError(error)).toEqual(expected);
   });
 });

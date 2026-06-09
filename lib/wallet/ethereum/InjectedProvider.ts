@@ -20,14 +20,12 @@ import {
   Transaction,
   TransactionResponse,
 } from 'ethers';
-import type {
-  EthProviderServiceConfig,
-  EvmConfig,
-} from '../../Config';
+import type { EthProviderServiceConfig, EvmConfig } from '../../Config';
 import type Logger from '../../Logger';
 import { formatError, stringify } from '../../Utils';
 import PendingEthereumTransactionRepository from '../../db/repositories/PendingEthereumTransactionRepository';
 import Errors from './Errors';
+import { isTransientRpcError } from './EthereumUtils';
 import type { NetworkDetails } from './EvmNetworks';
 
 enum EthProviderService {
@@ -44,6 +42,18 @@ class InjectedProvider implements Provider {
   public readonly provider: this;
 
   private providers = new Map<string, JsonRpcProvider>();
+
+  // The unwrapped "getLogs" of the underlying providers, keyed by provider name.
+  // We wrap "getLogs" on the providers themselves to make ethers' internal
+  // event poller resilient to transient RPC failures (see
+  // "wrapProviderEventPolling"), but our own forwarded calls (e.g. the rescan
+  // via "queryFilter") must keep seeing the raw errors so they are not silently
+  // dropped.
+  private originalGetLogs = new Map<
+    string,
+    (filter: Filter) => Promise<Array<Log>>
+  >();
+
   private readonly publicBroadcastRpcs: string[];
 
   private network!: Network;
@@ -76,14 +86,8 @@ class InjectedProvider implements Provider {
       );
     }
 
-    this.addEthProvider(
-      EthProviderService.Infura,
-      config.infura,
-    );
-    this.addEthProvider(
-      EthProviderService.Alchemy,
-      config.alchemy,
-    );
+    this.addEthProvider(EthProviderService.Infura, config.infura);
+    this.addEthProvider(EthProviderService.Alchemy, config.alchemy);
 
     if (this.providers.size === 0) {
       throw Errors.NO_PROVIDER_SPECIFIED();
@@ -127,6 +131,42 @@ class InjectedProvider implements Provider {
         this.networkDetails.name
       } RPC providers:\n - ${Array.from(this.providers.keys()).join('\n - ')}`,
     );
+
+    this.wrapProviderEventPolling();
+  };
+
+  /**
+   * ethers' internal event subscription poller (PollingEventSubscriber) calls
+   * "getLogs" on the underlying JsonRpcProvider on every new block and does not
+   * handle rejections, so a transient RPC failure (common on Citrea when the
+   * provider is briefly behind the chain head) surfaces as an *unhandled*
+   * promise rejection.
+   *
+   * We wrap "getLogs" on each underlying provider so that these known transient
+   * conditions are logged at WARN and treated as "no logs this poll" (returning
+   * an empty array). Any missed event is still picked up by the periodic
+   * ContractEventHandler rescan, while genuine errors keep propagating.
+   */
+  private wrapProviderEventPolling = () => {
+    for (const [providerName, provider] of this.providers) {
+      const originalGetLogs = provider.getLogs.bind(provider);
+      this.originalGetLogs.set(providerName, originalGetLogs);
+
+      provider.getLogs = async (filter: Filter): Promise<Array<Log>> => {
+        try {
+          return await originalGetLogs(filter);
+        } catch (error) {
+          if (isTransientRpcError(error)) {
+            this.logger.warn(
+              `Transient error polling ${this.networkDetails.name} logs via RPC provider ${providerName}, will retry on next poll: ${formatError(error)}`,
+            );
+            return [];
+          }
+
+          throw error;
+        }
+      };
+    }
   };
 
   private addEthProvider = (
@@ -418,7 +458,9 @@ class InjectedProvider implements Provider {
       provider.broadcastTransaction(signedTransaction),
     );
 
-    await this.broadcastToPublicRpcs(signedTransaction, tx.hash!).catch(() => {});
+    await this.broadcastToPublicRpcs(signedTransaction, tx.hash!).catch(
+      () => {},
+    );
 
     const settled = await Promise.allSettled(promises);
     const results = settled
@@ -439,7 +481,7 @@ class InjectedProvider implements Provider {
     const hasAlreadyKnown = rejected.some((res) =>
       InjectedProvider.isAlreadyKnownError(res.reason),
     );
-    
+
     if (hasAlreadyKnown && tx.hash) {
       this.logger.info(
         `${this.networkDetails.name} transaction ${tx.hash} already in mempool, treating as success`,
@@ -450,7 +492,9 @@ class InjectedProvider implements Provider {
         return existing;
       }
 
-      this.logger.info(`Returning existing transaction ${tx.hash} from provider ${this.providers.values().next().value!.constructor.name}`);
+      this.logger.info(
+        `Returning existing transaction ${tx.hash} from provider ${this.providers.values().next().value!.constructor.name}`,
+      );
       const provider = this.providers.values().next().value!;
       return new TransactionResponse(tx as any, provider);
     }
@@ -631,10 +675,15 @@ class InjectedProvider implements Provider {
 
     for (const [providerName, provider] of this.providers) {
       try {
-        const result = await this.promiseWithTimeout(
-          provider[method](...args),
-          'timeout',
-        );
+        // Use the unwrapped "getLogs" so forwarded calls (e.g. the rescan)
+        // observe transient RPC errors instead of the empty array the
+        // poller-resilient wrapper would return.
+        const call =
+          method === 'getLogs' && this.originalGetLogs.has(providerName)
+            ? this.originalGetLogs.get(providerName)!(...(args as [Filter]))
+            : provider[method](...args);
+
+        const result = await this.promiseWithTimeout(call, 'timeout');
 
         if (result !== null) {
           return result;
