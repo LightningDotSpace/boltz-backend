@@ -10,7 +10,7 @@ import type Logger from '../../../Logger';
 import { formatError } from '../../../Utils';
 import TypedEventEmitter from '../../../consts/TypedEventEmitter';
 import type { ERC20SwapValues, EtherSwapValues } from '../../../consts/Types';
-import { parseBuffer } from '../EthereumUtils';
+import { isTransientRpcError, parseBuffer } from '../EthereumUtils';
 import type { NetworkDetails } from '../EvmNetworks';
 import { formatERC20SwapValues, formatEtherSwapValues } from './ContractUtils';
 
@@ -56,6 +56,12 @@ class ContractEventHandler extends TypedEventEmitter<Events> {
   // Check for missed events every 5 minutes
   private static readonly missedEventsCheckInterval = 1_000 * 60 * 5;
 
+  // Number of consecutive transient rescan failures after which we stop
+  // treating them as transient noise and escalate to ERROR. A brief blip
+  // recovers within an interval or two; failing this many intervals in a row
+  // is a sustained RPC outage that must stay visible.
+  private static readonly maxTransientRescanFailures = 3;
+
   // Max block range per eth_getLogs query (Citrea RPC rejects ranges >= 1000)
   private static readonly maxBlockRangePerQuery = 999;
 
@@ -70,6 +76,7 @@ class ContractEventHandler extends TypedEventEmitter<Events> {
 
   private rescanLastHeight = 0;
   private rescanInterval: NodeJS.Timeout | undefined;
+  private rescanFailureCount = 0;
 
   constructor(private readonly logger: Logger) {
     super();
@@ -98,9 +105,23 @@ class ContractEventHandler extends TypedEventEmitter<Events> {
     this.rescanInterval = setInterval(async () => {
       try {
         await this.checkMissedEvents(provider);
+        this.rescanFailureCount = 0;
       } catch (error) {
-        this.logger.error(
-          `Error checking for missed events of ${this.networkDetails.name} contracts v${version}: ${formatError(error)}`,
+        this.rescanFailureCount++;
+
+        // Transient RPC failures (e.g. a Citrea provider briefly behind the
+        // chain head) are expected and recovered on the next interval, so we
+        // log them at WARN without advancing the scan height. But a *persistent*
+        // failure is no longer transient noise: once the rescan has failed for
+        // several consecutive intervals we escalate to ERROR so a genuine,
+        // sustained RPC outage stays visible. Unexpected errors go to ERROR
+        // immediately.
+        const sustained =
+          this.rescanFailureCount >=
+          ContractEventHandler.maxTransientRescanFailures;
+        const level = isTransientRpcError(error) && !sustained ? 'warn' : 'error';
+        this.logger[level](
+          `Error checking for missed events of ${this.networkDetails.name} contracts v${version} (attempt ${this.rescanFailureCount}), will retry next interval: ${formatError(error)}`,
         );
       }
     }, ContractEventHandler.missedEventsCheckInterval);
@@ -117,8 +138,7 @@ class ContractEventHandler extends TypedEventEmitter<Events> {
     startHeight: number,
     endHeight?: number,
   ): Promise<void> => {
-    const actualEndHeight =
-      endHeight ?? (await this.provider.getBlockNumber());
+    const actualEndHeight = endHeight ?? (await this.provider.getBlockNumber());
     const range = actualEndHeight - startHeight;
 
     // If range exceeds limit, split into chunks
