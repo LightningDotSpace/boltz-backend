@@ -161,6 +161,14 @@ class Service {
   private static MinInboundLiquidity = 10;
   private static MaxInboundLiquidity = 50;
 
+  // How long a successfully fetched gas price may be served from cache when a
+  // subsequent fetch fails. Shields fee estimations from transient RPC timeouts.
+  private static GasPriceCacheTtl = 60_000;
+  private readonly gasPriceCache = new Map<
+    Provider,
+    { price: bigint; timestamp: number }
+  >();
+
   constructor(
     private logger: Logger,
     notifications: NotificationClient | undefined,
@@ -2438,8 +2446,24 @@ class Service {
   };
 
   private getGasPrice = async (provider: Provider) => {
-    const feeData = await provider.getFeeData();
-    return (feeData.gasPrice || feeData.maxFeePerGas)!;
+    try {
+      const feeData = await provider.getFeeData();
+      const price = (feeData.gasPrice || feeData.maxFeePerGas)!;
+      this.gasPriceCache.set(provider, { price, timestamp: Date.now() });
+      return price;
+    } catch (error) {
+      const cached = this.gasPriceCache.get(provider);
+      const age = cached !== undefined ? Date.now() - cached.timestamp : 0;
+
+      if (cached !== undefined && age <= Service.GasPriceCacheTtl) {
+        this.logger.warn(
+          `Could not fetch gas price, serving cached value from ${age / 1000}s ago: ${formatError(error)}`,
+        );
+        return cached.price;
+      }
+
+      throw error;
+    }
   };
 
   private getReferralId = async (
