@@ -162,8 +162,10 @@ class Service {
   private static MaxInboundLiquidity = 50;
 
   // How long a successfully fetched gas price may be served from cache when a
-  // subsequent fetch fails. Shields fee estimations from transient RPC timeouts.
-  private static GasPriceCacheTtl = 60_000;
+  // subsequent fetch fails. Must comfortably exceed the fetch interval plus the
+  // RPC timeout (a failure registers ~90s after the last success) and bridge
+  // the 2-10 min RPC stalls the Citrea node shows during RocksDB compaction.
+  private static GasPriceCacheTtl = 10 * 60 * 1000;
   private readonly gasPriceCache = new Map<
     Provider,
     { price: bigint; timestamp: number }
