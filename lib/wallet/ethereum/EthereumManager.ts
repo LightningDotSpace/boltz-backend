@@ -10,7 +10,7 @@ import {
 } from 'ethers';
 import type { EvmConfig } from '../../Config';
 import type Logger from '../../Logger';
-import { stringify } from '../../Utils';
+import { formatError, stringify } from '../../Utils';
 import { CurrencyType } from '../../consts/Enums';
 import ChainTipRepository from '../../db/repositories/ChainTipRepository';
 import Errors from '../Errors';
@@ -158,18 +158,7 @@ class EthereumManager {
               new Wallet(this.logger, CurrencyType.ERC20, provider),
             );
 
-            let nonce = await this.signer.getNonce();
-            for (const c of this.contracts) {
-              if (
-                await this.checkERC20Allowance(
-                  provider,
-                  await c.erc20Swap.getAddress(),
-                  nonce,
-                )
-              ) {
-                nonce += 1;
-              }
-            }
+            await this.setErc20Allowances(provider);
           } else {
             throw Errors.INVALID_ETHEREUM_CONFIGURATION(
               `duplicate ${token.symbol} token config`,
@@ -269,6 +258,32 @@ class EthereumManager {
     return contracts
       .decodeClaimData(tx.data)
       .reduce((acc, { amount }) => acc + amount, 0n);
+  };
+
+  private setErc20Allowances = async (
+    erc20Wallet: ERC20WalletProvider,
+  ): Promise<void> => {
+    let nonce = await this.signer.getNonce();
+
+    for (const c of this.contracts) {
+      const erc20SwapAddress = await c.erc20Swap.getAddress();
+
+      // Setting the allowance is best-effort: when the wallet has no native
+      // balance to pay for gas, the approval (or its gas estimation) fails.
+      // Instead of crashing the startup we warn loudly and keep booting.
+      try {
+        if (
+          await this.checkERC20Allowance(erc20Wallet, erc20SwapAddress, nonce)
+        ) {
+          nonce += 1;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Could not set allowance of ${erc20Wallet.symbol} for ${erc20SwapAddress}: ${formatError(error)}. ` +
+            `ERC20 lockups for ${erc20Wallet.symbol} will fail until the wallet is funded and the backend is restarted`,
+        );
+      }
+    }
   };
 
   private checkERC20Allowance = async (
