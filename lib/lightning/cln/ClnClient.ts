@@ -1,5 +1,5 @@
 import type { ChannelCredentials, ClientReadableStream } from '@grpc/grpc-js';
-import { Metadata, status } from '@grpc/grpc-js';
+import { Metadata } from '@grpc/grpc-js';
 import BaseClient from '../../BaseClient';
 import type Logger from '../../Logger';
 import { formatError, getHexBuffer, getHexString } from '../../Utils';
@@ -136,6 +136,11 @@ class ClnClient
 
       try {
         await this.getInfo();
+
+        // A timer that already fired still holds a handle, and scheduleReconnect
+        // treats any handle as a reconnect in flight. Not clearing it here would
+        // turn scheduleReconnect into a permanent no-op after a retried connect.
+        this.clearReconnectTimer();
         this.setClientStatus(ClientStatus.Connected);
       } catch (error) {
         this.setClientStatus(ClientStatus.Disconnected);
@@ -780,9 +785,10 @@ class ClnClient
     req.setPaymentHashesList(Array.from(this.holdInvoicesToSubscribe.values()));
     this.holdInvoicesToSubscribe.clear();
 
-    this.trackAllSubscription = this.holdClient!.trackAll(req);
+    const subscription = this.holdClient!.trackAll(req);
+    this.trackAllSubscription = subscription;
 
-    this.trackAllSubscription.on('data', (update: holdrpc.TrackAllResponse) => {
+    subscription.on('data', (update: holdrpc.TrackAllResponse) => {
       switch (update.getState()) {
         case holdrpc.InvoiceState.ACCEPTED:
           this.logger.debug(
@@ -805,8 +811,12 @@ class ClnClient
           break;
       }
     });
-    this.trackAllSubscription.on('error', async (error) => {
-      await this.handleSubscriptionError('track hold invoices', error);
+    subscription.on('error', async (error) => {
+      await this.handleSubscriptionError(
+        'track hold invoices',
+        subscription,
+        error,
+      );
     });
   };
 
@@ -833,12 +843,19 @@ class ClnClient
 
   private handleSubscriptionError = async (
     subscriptionName: string,
+    subscription: ClientReadableStream<unknown>,
     error: any,
   ) => {
-    // Deliberate local cancels (resubscribing or shutting down) would otherwise
-    // trigger a reconnect, which cancels the previous subscription again and
-    // feeds itself into a perpetual reconnect loop
-    if (error?.code === status.CANCELLED) {
+    // Resubscribing and disconnecting cancel the previous stream, and grpc-js
+    // reports that cancellation to the cancelled stream's own error handler.
+    // Those errors are expected and must not trigger a reconnect, which would
+    // cancel the current subscription again and feed itself into a loop.
+    //
+    // The stale check keys on stream identity rather than the CANCELLED status
+    // code: grpc-js reports a remote peer cancelling an active stream with the
+    // very same code, and swallowing that would leave the client connected to a
+    // subscription that is silently dead.
+    if (this.trackAllSubscription !== subscription) {
       return;
     }
 
@@ -850,6 +867,7 @@ class ClnClient
 
     if (this.isConnected()) {
       this.emit('subscription.error', subscriptionName);
+      this.setClientStatus(ClientStatus.Disconnected);
     }
 
     this.scheduleReconnect();

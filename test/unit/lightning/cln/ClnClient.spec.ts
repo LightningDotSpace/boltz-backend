@@ -1,16 +1,19 @@
 import type { ClientReadableStream } from '@grpc/grpc-js';
-import { status } from '@grpc/grpc-js';
+import { credentials, status } from '@grpc/grpc-js';
 import { EventEmitter } from 'events';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import Logger from '../../../lib/Logger';
-import { ClientStatus } from '../../../lib/consts/Enums';
-import LndClient from '../../../lib/lightning/LndClient';
+import Logger from '../../../../lib/Logger';
+import { ClientStatus } from '../../../../lib/consts/Enums';
+import ClnClient from '../../../../lib/lightning/cln/ClnClient';
 
-describe('LndClient', () => {
-  let certDir: string;
-  let client: LndClient;
+// Reading and parsing the TLS certificates is environment setup, not part of
+// the reconnect behaviour under test
+jest.mock('../../../../lib/lightning/cln/Types', () => ({
+  ...jest.requireActual('../../../../lib/lightning/cln/Types'),
+  createSsl: jest.fn(() => credentials.createInsecure()),
+}));
+
+describe('ClnClient', () => {
+  let client: ClnClient;
 
   const activeStream = () =>
     ({}) as unknown as ClientReadableStream<unknown> as any;
@@ -21,25 +24,26 @@ describe('LndClient', () => {
     return stream;
   };
 
-  // The error handlers are async, so their reaction lands a microtask later
+  // The error handler is async, so its reaction lands a microtask later
   const flush = () => new Promise(process.nextTick);
 
-  beforeAll(() => {
-    certDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lnd-client-spec-'));
-    fs.writeFileSync(path.join(certDir, 'tls.cert'), 'certificate');
-  });
-
-  afterAll(() => {
-    fs.rmSync(certDir, { recursive: true, force: true });
-  });
+  const certs = {
+    rootCertPath: 'ca.pem',
+    privateKeyPath: 'client-key.pem',
+    certChainPath: 'client.pem',
+  };
 
   beforeEach(() => {
-    client = new LndClient(Logger.disabledLogger, 'BTC', {
+    client = new ClnClient(Logger.disabledLogger, 'BTC', {
       host: '127.0.0.1',
-      port: 10009,
-      certpath: path.join(certDir, 'tls.cert'),
-      macaroonpath: '',
+      port: 9736,
       maxPaymentFeeRatio: 0.01,
+      ...certs,
+      hold: {
+        host: '127.0.0.1',
+        port: 9292,
+        ...certs,
+      },
     });
   });
 
@@ -56,12 +60,16 @@ describe('LndClient', () => {
 
       // The stream that errored is not the one the client currently holds,
       // which is what resubscribing and disconnecting leave behind
-      client['peerEventSubscription'] = activeStream();
+      client['trackAllSubscription'] = activeStream();
 
-      await client['handleSubscriptionError']('peer event', activeStream(), {
-        code: status.CANCELLED,
-        details: 'Cancelled on client',
-      });
+      await client['handleSubscriptionError'](
+        'track hold invoices',
+        activeStream(),
+        {
+          code: status.CANCELLED,
+          details: 'Cancelled on client',
+        },
+      );
 
       expect(scheduleReconnect).not.toHaveBeenCalled();
       expect(client.isConnected()).toEqual(true);
@@ -76,38 +84,19 @@ describe('LndClient', () => {
       // grpc-js reports a remote peer cancelling an active stream with the same
       // status code as a local cancel, so the code alone must not silence it
       const subscription = activeStream();
-      client['peerEventSubscription'] = subscription;
+      client['trackAllSubscription'] = subscription;
 
-      await client['handleSubscriptionError']('peer event', subscription, {
-        code: status.CANCELLED,
-        details: 'Call cancelled',
-      });
+      await client['handleSubscriptionError'](
+        'track hold invoices',
+        subscription,
+        {
+          code: status.CANCELLED,
+          details: 'Call cancelled',
+        },
+      );
 
       expect(scheduleReconnect).toHaveBeenCalledTimes(1);
       expect(client.isConnected()).toEqual(false);
-    });
-
-    test('should reconnect through the timer guard instead of directly', async () => {
-      client.setClientStatus(ClientStatus.Connected);
-      const reconnect = jest
-        .spyOn(client as any, 'reconnect')
-        .mockResolvedValue(undefined);
-      const scheduleReconnect = jest
-        .spyOn(client as any, 'scheduleReconnect')
-        .mockImplementation(() => {});
-
-      const subscription = activeStream();
-      client['channelEventSubscription'] = subscription;
-
-      await client['handleSubscriptionError']('channel event', subscription, {
-        code: status.UNAVAILABLE,
-        details: 'Connection dropped',
-      });
-
-      // Calling reconnect directly would bypass the guard and resubscribe
-      // without a backoff
-      expect(reconnect).not.toHaveBeenCalled();
-      expect(scheduleReconnect).toHaveBeenCalledTimes(1);
     });
 
     test('should emit and mark the client disconnected while connected', async () => {
@@ -118,40 +107,51 @@ describe('LndClient', () => {
 
       const emit = jest.spyOn(client, 'emit');
       const subscription = activeStream();
-      client['peerEventSubscription'] = subscription;
+      client['trackAllSubscription'] = subscription;
 
-      await client['handleSubscriptionError']('peer event', subscription, {
-        code: status.UNAVAILABLE,
-        details: 'Connection dropped',
-      });
+      await client['handleSubscriptionError'](
+        'track hold invoices',
+        subscription,
+        {
+          code: status.UNAVAILABLE,
+          details: 'Connection dropped',
+        },
+      );
 
-      expect(emit).toHaveBeenCalledWith('subscription.error', 'peer event');
+      expect(emit).toHaveBeenCalledWith(
+        'subscription.error',
+        'track hold invoices',
+      );
       expect(client.isDisconnected()).toEqual(true);
     });
 
-    test('should schedule a reconnect on genuine errors while disconnected', async () => {
+    test('should schedule a reconnect on genuine errors', async () => {
       const scheduleReconnect = jest
         .spyOn(client as any, 'scheduleReconnect')
         .mockImplementation(() => {});
 
       const subscription = activeStream();
-      client['channelEventSubscription'] = subscription;
+      client['trackAllSubscription'] = subscription;
 
-      await client['handleSubscriptionError']('channel event', subscription, {
-        code: status.UNAVAILABLE,
-        details: 'Connection dropped',
-      });
+      await client['handleSubscriptionError'](
+        'track hold invoices',
+        subscription,
+        {
+          code: status.UNAVAILABLE,
+          details: 'Connection dropped',
+        },
+      );
 
       expect(scheduleReconnect).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('subscribePeerEvents', () => {
+  describe('subscribeTrackHoldInvoices', () => {
     test('should only react to errors of the stream it is currently on', async () => {
       const streams = [fakeStream(), fakeStream()];
       let created = 0;
-      client['lightning'] = {
-        subscribePeerEvents: jest.fn(() => streams[created++]),
+      client['holdClient'] = {
+        trackAll: jest.fn(() => streams[created++]),
       } as any;
 
       client.setClientStatus(ClientStatus.Connected);
@@ -159,8 +159,8 @@ describe('LndClient', () => {
         .spyOn(client as any, 'scheduleReconnect')
         .mockImplementation(() => {});
 
-      client['subscribePeerEvents']();
-      client['subscribePeerEvents']();
+      client.subscribeTrackHoldInvoices();
+      client.subscribeTrackHoldInvoices();
 
       expect(streams[0].cancel).toHaveBeenCalledTimes(1);
 
@@ -186,8 +186,8 @@ describe('LndClient', () => {
 
     test('should not reconnect when disconnect cancelled the subscription', async () => {
       const stream = fakeStream();
-      client['lightning'] = {
-        subscribePeerEvents: jest.fn(() => stream),
+      client['holdClient'] = {
+        trackAll: jest.fn(() => stream),
         close: jest.fn(),
       } as any;
 
@@ -196,7 +196,7 @@ describe('LndClient', () => {
         .spyOn(client as any, 'scheduleReconnect')
         .mockImplementation(() => {});
 
-      client['subscribePeerEvents']();
+      client.subscribeTrackHoldInvoices();
       client.disconnect();
 
       stream.emit('error', {
@@ -209,17 +209,43 @@ describe('LndClient', () => {
     });
   });
 
-  describe('reconnect', () => {
-    test('should not leak a pending reconnect timer when reconnecting fails', async () => {
+  describe('connect', () => {
+    test('should clear the retry timer once a retried connect succeeds', async () => {
       jest.useFakeTimers();
       jest
         .spyOn(client as any, 'getInfo')
-        .mockRejectedValue(new Error('connection refused'));
+        .mockRejectedValueOnce(new Error('connection refused'))
+        .mockResolvedValue({});
+
+      // The first attempt fails and arms the retry timer
+      await client.connect();
+      expect(client.isDisconnected()).toEqual(true);
+      expect(client['reconnectionTimer']).toBeDefined();
+
+      // The armed timer fires and reconnects successfully
+      await jest.advanceTimersByTimeAsync(5000);
+
+      expect(client.isConnected()).toEqual(true);
+
+      // A fired handle left behind here would make scheduleReconnect, the only
+      // recovery path of this client, a no-op for the rest of the process
+      expect(client['reconnectionTimer']).toBeUndefined();
+    });
+
+    test('should keep scheduling reconnects after a retried connect', async () => {
+      jest.useFakeTimers();
+      jest
+        .spyOn(client as any, 'getInfo')
+        .mockRejectedValueOnce(new Error('connection refused'))
+        .mockResolvedValue({});
+
+      await client.connect();
+      await jest.advanceTimersByTimeAsync(5000);
+      expect(client.isConnected()).toEqual(true);
 
       client['scheduleReconnect']();
-      expect(jest.getTimerCount()).toEqual(1);
 
-      await client['reconnect']();
+      expect(client['reconnectionTimer']).toBeDefined();
       expect(jest.getTimerCount()).toEqual(1);
     });
   });

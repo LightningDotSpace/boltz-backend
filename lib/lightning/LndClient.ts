@@ -1,5 +1,5 @@
 import type { ChannelCredentials, ClientReadableStream } from '@grpc/grpc-js';
-import { Metadata, credentials, status } from '@grpc/grpc-js';
+import { Metadata, credentials } from '@grpc/grpc-js';
 import fs from 'fs';
 import BaseClient from '../BaseClient';
 import type Logger from '../Logger';
@@ -1000,14 +1000,31 @@ class LndClient extends BaseClient<EventTypes> implements LightningClient {
     }
   };
 
+  /**
+   * Whether a stream has already been replaced by a newer subscription or
+   * cancelled by {@link disconnect}
+   */
+  private isStaleSubscription = (
+    subscription: ClientReadableStream<unknown>,
+  ): boolean =>
+    this.peerEventSubscription !== subscription &&
+    this.channelEventSubscription !== subscription;
+
   private handleSubscriptionError = async (
     subscriptionName: string,
+    subscription: ClientReadableStream<unknown>,
     error: any,
   ) => {
-    // Deliberate local cancels (resubscribing or shutting down) would otherwise
-    // trigger a reconnect, which cancels the previous subscriptions again and
-    // feeds itself into an unthrottled reconnect loop
-    if (error?.code === status.CANCELLED) {
+    // Resubscribing and disconnecting cancel the previous stream, and grpc-js
+    // reports that cancellation to the cancelled stream's own error handler.
+    // Those errors are expected and must not trigger a reconnect, which would
+    // cancel the current subscriptions again and feed itself into a loop.
+    //
+    // The stale check keys on stream identity rather than the CANCELLED status
+    // code: grpc-js reports a remote peer cancelling an active stream with the
+    // very same code, and swallowing that would leave the client connected to a
+    // subscription that is silently dead.
+    if (this.isStaleSubscription(subscription)) {
       return;
     }
 
@@ -1019,10 +1036,13 @@ class LndClient extends BaseClient<EventTypes> implements LightningClient {
 
     if (this.isConnected()) {
       this.emit('subscription.error', subscriptionName);
-      await this.reconnect();
-    } else {
-      this.scheduleReconnect();
+      this.setClientStatus(ClientStatus.Disconnected);
     }
+
+    // Always reconnect through the timer guard. Calling reconnect() directly
+    // would bypass it, and because reconnect() resubscribes, any error that
+    // reproduces on the new subscription would spin without a backoff.
+    this.scheduleReconnect();
   };
 
   private subscribePeerEvents = () => {
@@ -1030,17 +1050,20 @@ class LndClient extends BaseClient<EventTypes> implements LightningClient {
       this.peerEventSubscription.cancel();
     }
 
-    this.peerEventSubscription = this.lightning!.subscribePeerEvents(
+    const subscription = this.lightning!.subscribePeerEvents(
       new lndrpc.PeerEventSubscription(),
       this.meta,
-    )
+    );
+    this.peerEventSubscription = subscription;
+
+    subscription
       .on('data', (event: lndrpc.PeerEvent) => {
         if (event.getType() === lndrpc.PeerEvent.EventType.PEER_ONLINE) {
           this.emit('peer.online', event.getPubKey());
         }
       })
       .on('error', async (error) => {
-        await this.handleSubscriptionError('peer event', error);
+        await this.handleSubscriptionError('peer event', subscription, error);
       });
   };
 
@@ -1049,10 +1072,13 @@ class LndClient extends BaseClient<EventTypes> implements LightningClient {
       this.channelEventSubscription.cancel();
     }
 
-    this.channelEventSubscription = this.lightning!.subscribeChannelEvents(
+    const subscription = this.lightning!.subscribeChannelEvents(
       new lndrpc.ChannelEventSubscription(),
       this.meta,
-    )
+    );
+    this.channelEventSubscription = subscription;
+
+    subscription
       .on('data', (event: lndrpc.ChannelEventUpdate) => {
         if (
           event.getType() ===
@@ -1062,7 +1088,11 @@ class LndClient extends BaseClient<EventTypes> implements LightningClient {
         }
       })
       .on('error', async (error) => {
-        await this.handleSubscriptionError('channel event', error);
+        await this.handleSubscriptionError(
+          'channel event',
+          subscription,
+          error,
+        );
       });
   };
 }
