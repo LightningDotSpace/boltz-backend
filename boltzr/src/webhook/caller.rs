@@ -175,10 +175,7 @@ where
             return Err(UrlError::MoreThanMaxLen.into());
         }
 
-        let url = match Url::parse(url) {
-            Ok(url) => url,
-            Err(err) => return Err(err.into()),
-        };
+        let url = Url::parse(url)?;
 
         if !allow_http && url.scheme() != "https" {
             return Err(UrlError::HttpsRequired.into());
@@ -659,14 +656,7 @@ mod caller_test {
         web_hook_helper
             .expect_should_be_skipped()
             .times(2)
-            .returning(move |_, _| {
-                if is_first_call {
-                    is_first_call = false;
-                    true
-                } else {
-                    false
-                }
-            });
+            .returning(move |_, _| std::mem::take(&mut is_first_call));
 
         let id = "gm";
         let port = 10004;

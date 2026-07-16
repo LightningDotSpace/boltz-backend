@@ -418,7 +418,7 @@ impl SwapRescue {
             Self::process_rescuable_swaps,
         )?;
 
-        rescuable.sort_by(|a, b| a.details.key_index.cmp(&b.details.key_index));
+        rescuable.sort_by_key(|a| a.details.key_index);
         Ok(rescuable)
     }
 
