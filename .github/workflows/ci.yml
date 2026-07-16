@@ -59,6 +59,16 @@ jobs:
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get -y install protobuf-compiler libsqlite3-dev
 
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: 'npm'
+
+      # boltzr-cli embeds the contract artifacts that ship with boltz-core
+      - name: Install dependencies
+        run: npm ci
+
       - name: Install Rust
         run: rustup update stable && rustup default stable && rustup component add rustfmt clippy
 
