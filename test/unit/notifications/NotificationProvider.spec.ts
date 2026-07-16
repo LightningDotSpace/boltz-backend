@@ -11,6 +11,7 @@ import { satToMsat } from '../../../lib/lightning/ChannelUtils';
 import { Emojis } from '../../../lib/notifications/Markup';
 import NotificationClient from '../../../lib/notifications/NotificationClient';
 import NotificationProvider from '../../../lib/notifications/NotificationProvider';
+import type BalanceService from '../../../lib/service/BalanceService';
 import Service from '../../../lib/service/Service';
 import type Sidecar from '../../../lib/sidecar/Sidecar';
 import WalletManager from '../../../lib/wallet/WalletManager';
@@ -40,6 +41,9 @@ const mockGetInfo = jest.fn().mockImplementation(() =>
     getChainsMap: () => [],
   }),
 );
+
+const mockCapturePeriodicSnapshot = jest.fn().mockResolvedValue(undefined);
+const mockCaptureSwapSnapshot = jest.fn().mockResolvedValue(undefined);
 
 const mockGetBalance = jest.fn().mockImplementation(() =>
   Promise.resolve({
@@ -147,6 +151,11 @@ describe('NotificationProvider', () => {
     otpsecretpath: `${__dirname}/otpSecret.dat`,
   };
 
+  const balanceService = {
+    capturePeriodicSnapshot: mockCapturePeriodicSnapshot,
+    captureSwapSnapshot: mockCaptureSwapSnapshot,
+  } as unknown as BalanceService;
+
   const walletManager = MockedWalletManager();
   const notificationProvider = new NotificationProvider(
     Logger.disabledLogger,
@@ -155,8 +164,7 @@ describe('NotificationProvider', () => {
     walletManager,
     config,
     mockedNotificationClient(),
-    [],
-    [],
+    balanceService,
   );
 
   beforeEach(() => {
@@ -184,7 +192,7 @@ describe('NotificationProvider', () => {
     expect(mockSendMessage).toHaveBeenCalledWith('Started Boltz instance');
 
     expect(mockGetInfo).toHaveBeenCalledTimes(1);
-    expect(mockGetBalance).toHaveBeenCalledTimes(1);
+    expect(mockCapturePeriodicSnapshot).toHaveBeenCalledTimes(1);
   });
 
   test('should send a notification after successful Swaps', async () => {

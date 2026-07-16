@@ -136,7 +136,7 @@ jest.mock('../../../lib/wallet/ethereum/EthereumManager', () => {
     networkDetails: Ethereum,
     tokenAddresses: new Map([['USDT', mockTokenAddress]]),
     provider: {
-      on: mockOnProvider
+      on: mockOnProvider,
       getTransaction: mockGetTransaction,
     },
     contractEventHandler: {

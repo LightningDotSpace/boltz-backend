@@ -154,7 +154,8 @@ describe('TimeoutDeltaProvider', () => {
   });
 
   test('should set block times of tokens', () => {
-    expect(TimeoutDeltaProvider.blockTimes.size).toEqual(9);
+    // 13 static entries, plus USDT, USDC and DLLR injected by init above
+    expect(TimeoutDeltaProvider.blockTimes.size).toEqual(16);
     expect(TimeoutDeltaProvider.blockTimes.get('USDT')).toEqual(
       TimeoutDeltaProvider.blockTimes.get(Ethereum.symbol),
     );

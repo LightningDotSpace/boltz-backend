@@ -55,7 +55,7 @@ describe('EthereumManager', () => {
     await fundSignerWallet(setup.signer, setup.etherBase);
     const contracts = await getContracts(setup.signer);
 
-    manager = new EthereumManager(Logger.disabledLogger, false, {
+    manager = new EthereumManager(Logger.disabledLogger, Ethereum, {
       providerEndpoint,
       networkName: 'Anvil',
       contracts: [
@@ -98,7 +98,7 @@ describe('EthereumManager', () => {
     ${{ erc20SwapAddress: '0x2' }}
   `('constructor should throw with invalid config $config', ({ config }) => {
     expect(
-      () => new EthereumManager(Logger.disabledLogger, false, config),
+      () => new EthereumManager(Logger.disabledLogger, Ethereum, config),
     ).toThrow(Errors.MISSING_SWAP_CONTRACTS().message);
   });
 
