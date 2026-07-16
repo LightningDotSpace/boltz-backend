@@ -9,6 +9,7 @@
     "compile": "npm run compile:rust && npm run compile:typescript",
     "compile:release": "npm run compile:rust:release && npm run compile:typescript",
     "compile:typescript": "node parseGitCommit.js && npm run swagger && tsc && cross-os postcompile",
+    "compile:typescript:test": "tsc --project tsconfig.test.json",
     "compile:rust": "cargo build",
     "compile:rust:release": "cargo build --release",
     "swagger": "node swagger.js",
