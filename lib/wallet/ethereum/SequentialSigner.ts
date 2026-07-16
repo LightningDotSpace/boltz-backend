@@ -3,8 +3,8 @@ import AsyncLock from 'async-lock';
 import type {
   Provider,
   Signer,
-  TransactionResponse,
   TransactionRequest,
+  TransactionResponse,
   TypedDataDomain,
   TypedDataField,
 } from 'ethers';

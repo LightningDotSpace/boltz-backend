@@ -1099,38 +1099,52 @@ class Migration {
 
       // Mark chain swaps as completed where both sides were claimed on-chain
       case 23: {
-        this.logger.info('Marking chain swaps as completed where both sides were claimed');
+        this.logger.info(
+          'Marking chain swaps as completed where both sides were claimed',
+        );
 
         const claimedSwaps = [
           {
-            preimageHash: '18535975363fddd3229bf3e5b2db1c69fa3776145e16f5bbe903de1b3849487b',
-            preimage: 'daf594221fc0e012d375fad4c9a9e6baa9892a291a5fd4324deabbcf34acdb42',
+            preimageHash:
+              '18535975363fddd3229bf3e5b2db1c69fa3776145e16f5bbe903de1b3849487b',
+            preimage:
+              'daf594221fc0e012d375fad4c9a9e6baa9892a291a5fd4324deabbcf34acdb42',
           },
           {
-            preimageHash: '97941e88d352781294a3d444440cdb5152a2209c9c2f701595dd96669c6d6fa5',
-            preimage: 'ab1d584ff7ac7d8fbe35c748c6d454bbd13cea62010f0b0eee505d563eff579b',
+            preimageHash:
+              '97941e88d352781294a3d444440cdb5152a2209c9c2f701595dd96669c6d6fa5',
+            preimage:
+              'ab1d584ff7ac7d8fbe35c748c6d454bbd13cea62010f0b0eee505d563eff579b',
           },
           {
-            preimageHash: 'c621c41be8d89cd61ef5ca576269615e8f48c03c226a303f681e98c31a039928',
-            preimage: 'a1a31b189ee0986078afc08223e0f1d0db00f370d6083be0a6a90a3b5ff91627',
+            preimageHash:
+              'c621c41be8d89cd61ef5ca576269615e8f48c03c226a303f681e98c31a039928',
+            preimage:
+              'a1a31b189ee0986078afc08223e0f1d0db00f370d6083be0a6a90a3b5ff91627',
           },
           {
-            preimageHash: '1172f916ed12e4f0e95112a23fa943a8675860c2d939b23700dee934ebc6c854',
-            preimage: '1c541b481437415f59b6d99a80cc29a664177cdf315c07ab84c056726abd50dc',
+            preimageHash:
+              '1172f916ed12e4f0e95112a23fa943a8675860c2d939b23700dee934ebc6c854',
+            preimage:
+              '1c541b481437415f59b6d99a80cc29a664177cdf315c07ab84c056726abd50dc',
           },
           {
-            preimageHash: '645232a4c7e36da2980107542b4d6e0f02205429cf189eabac30e1bdde5a3b3a',
-            preimage: 'dc3e01cc6a5fc068e183eaaf9c2c6c41c7b63116ff446b0f753d93c948301edf',
+            preimageHash:
+              '645232a4c7e36da2980107542b4d6e0f02205429cf189eabac30e1bdde5a3b3a',
+            preimage:
+              'dc3e01cc6a5fc068e183eaaf9c2c6c41c7b63116ff446b0f753d93c948301edf',
           },
           {
-            preimageHash: '565397362ad056882781c1799037b3f9382de27d6a80eef21d48c7b06acff093',
-            preimage: '450db698c8fef87e2263651ae041fca435fb55c7a7c2750b1b73c815d9487740',
+            preimageHash:
+              '565397362ad056882781c1799037b3f9382de27d6a80eef21d48c7b06acff093',
+            preimage:
+              '450db698c8fef87e2263651ae041fca435fb55c7a7c2750b1b73c815d9487740',
           },
         ];
 
         for (const swap of claimedSwaps) {
           const [, updated] = await this.sequelize.query(
-            `UPDATE "chainSwaps" SET status = $1, preimage = $2, "updatedAt" = NOW() WHERE "preimageHash" = $3 AND status NOT IN ($4, $5, $6)`,
+            'UPDATE "chainSwaps" SET status = $1, preimage = $2, "updatedAt" = NOW() WHERE "preimageHash" = $3 AND status NOT IN ($4, $5, $6)',
             {
               bind: [
                 SwapUpdateEvent.TransactionClaimed,
@@ -1145,7 +1159,9 @@ class Migration {
           );
 
           if (updated && updated > 0) {
-            this.logger.info(`Marked chain swap with preimageHash ${swap.preimageHash} as claimed`);
+            this.logger.info(
+              `Marked chain swap with preimageHash ${swap.preimageHash} as claimed`,
+            );
           }
         }
 
@@ -1155,7 +1171,9 @@ class Migration {
 
       // Clear stale refund state for BTC/cBTC chain swaps that are already claimed
       case 24: {
-        this.logger.info('Clearing stale refund state for already-claimed BTC chain swaps');
+        this.logger.info(
+          'Clearing stale refund state for already-claimed BTC chain swaps',
+        );
 
         // These swaps are already transaction.claimed but have stale pending refund transaction IDs
         // causing "No such mempool or blockchain transaction" errors in logs
@@ -1173,17 +1191,16 @@ class Migration {
 
         // Ensure these swaps are marked as claimed and clear any refund signature flag
         const [, updated] = await this.sequelize.query(
-          `UPDATE "chainSwaps" SET status = $1, "createdRefundSignature" = false, "updatedAt" = NOW() WHERE id = ANY($2::text[])`,
+          'UPDATE "chainSwaps" SET status = $1, "createdRefundSignature" = false, "updatedAt" = NOW() WHERE id = ANY($2::text[])',
           {
-            bind: [
-              SwapUpdateEvent.TransactionClaimed,
-              staleRefundSwapIds,
-            ],
+            bind: [SwapUpdateEvent.TransactionClaimed, staleRefundSwapIds],
             type: QueryTypes.UPDATE,
           },
         );
 
-        this.logger.info(`Updated ${updated} chain swaps to clear stale refund state`);
+        this.logger.info(
+          `Updated ${updated} chain swaps to clear stale refund state`,
+        );
 
         await this.finishMigration(versionRow.version, currencies);
         break;
@@ -1191,58 +1208,82 @@ class Migration {
 
       // Mark additional ERC20 chain swaps (USDT_POLYGON/JUSD_CITREA) as claimed with preimages from on-chain data
       case 25: {
-        this.logger.info('Marking additional ERC20 chain swaps as claimed with on-chain preimages');
+        this.logger.info(
+          'Marking additional ERC20 chain swaps as claimed with on-chain preimages',
+        );
 
         const claimedErc20Swaps = [
           {
-            preimageHash: '587b1abf273e6f24e60d39175c6f1d2212015b4c8bf10dedff1731a861bba308',
-            preimage: '5d30098db3b2dd05da88dd61a0b659ca19c3acf78e6ae91339b8ae1dcc7b93c8',
+            preimageHash:
+              '587b1abf273e6f24e60d39175c6f1d2212015b4c8bf10dedff1731a861bba308',
+            preimage:
+              '5d30098db3b2dd05da88dd61a0b659ca19c3acf78e6ae91339b8ae1dcc7b93c8',
           },
           {
-            preimageHash: '3141256e3813c347adc021ba39f8520cab1487fcfaf875c555832f8012224508',
-            preimage: '55044c8963e2c53e0634b52056ffc9a186cd6fe2ab28e305e4bce4dc3a594447',
+            preimageHash:
+              '3141256e3813c347adc021ba39f8520cab1487fcfaf875c555832f8012224508',
+            preimage:
+              '55044c8963e2c53e0634b52056ffc9a186cd6fe2ab28e305e4bce4dc3a594447',
           },
           {
-            preimageHash: 'dca2a29c4c0a92f75ec0e541729a07e9b42bd6b8f59fa701b00b7705307bd5c0',
-            preimage: 'ee5f23ffc148d96e15ff0c42577086d3174b5530aaa12757acd3c670b459f2db',
+            preimageHash:
+              'dca2a29c4c0a92f75ec0e541729a07e9b42bd6b8f59fa701b00b7705307bd5c0',
+            preimage:
+              'ee5f23ffc148d96e15ff0c42577086d3174b5530aaa12757acd3c670b459f2db',
           },
           {
-            preimageHash: '20d9337778e15b821300bd3ca9181ebf3dfffae04075c5d3ae958f848e7352b1',
-            preimage: '0b3e34fc512590971e7474fe61e911ff78a64ad16938e363b4ce8e412a6c71f4',
+            preimageHash:
+              '20d9337778e15b821300bd3ca9181ebf3dfffae04075c5d3ae958f848e7352b1',
+            preimage:
+              '0b3e34fc512590971e7474fe61e911ff78a64ad16938e363b4ce8e412a6c71f4',
           },
           {
-            preimageHash: '78c42d4d80cf7e927bde59213e5d4d32b11d6c1b2e8db14b4b3362c389fc89cf',
-            preimage: '1b710c09315ea7a3add9f2ed833df885ddf19f760ba2396012e9ccb4d29f4e64',
+            preimageHash:
+              '78c42d4d80cf7e927bde59213e5d4d32b11d6c1b2e8db14b4b3362c389fc89cf',
+            preimage:
+              '1b710c09315ea7a3add9f2ed833df885ddf19f760ba2396012e9ccb4d29f4e64',
           },
           {
-            preimageHash: '1d2638396c98bd853dee25f7040faf1c21eaea3248e15056d9eba213a8bd817e',
-            preimage: '2f92d4ebddc802e390d9d65da382fa9e4836f16d42bcd7a17de63ac61616c21d',
+            preimageHash:
+              '1d2638396c98bd853dee25f7040faf1c21eaea3248e15056d9eba213a8bd817e',
+            preimage:
+              '2f92d4ebddc802e390d9d65da382fa9e4836f16d42bcd7a17de63ac61616c21d',
           },
           {
-            preimageHash: '3b5dbff784af9278d06f420a6d19108a41f873dc87d6c0d7ede9f0024077a96c',
-            preimage: '6669afd47ae237e8f161af9b6ebd9c6f7976752b4b853a79beb24110e93bf423',
+            preimageHash:
+              '3b5dbff784af9278d06f420a6d19108a41f873dc87d6c0d7ede9f0024077a96c',
+            preimage:
+              '6669afd47ae237e8f161af9b6ebd9c6f7976752b4b853a79beb24110e93bf423',
           },
           {
-            preimageHash: 'edcdcc6c58bec965b7331e6e6d72cc942261b2aa181176cce62a62af6c31ac40',
-            preimage: 'b0b91584cfe5398578d656e0da27ae5bb84967e4a3f802ea6b49535920184c1c',
+            preimageHash:
+              'edcdcc6c58bec965b7331e6e6d72cc942261b2aa181176cce62a62af6c31ac40',
+            preimage:
+              'b0b91584cfe5398578d656e0da27ae5bb84967e4a3f802ea6b49535920184c1c',
           },
           {
-            preimageHash: '7b568ea84fa2d8f53f50854afc5f30b0b0a32bbf5acf90d827ca479fb6b83a28',
-            preimage: '97f72e91b7421eb10982c99ef64f8c33206a8f1ed04da4069c03e8333d27a7a4',
+            preimageHash:
+              '7b568ea84fa2d8f53f50854afc5f30b0b0a32bbf5acf90d827ca479fb6b83a28',
+            preimage:
+              '97f72e91b7421eb10982c99ef64f8c33206a8f1ed04da4069c03e8333d27a7a4',
           },
           {
-            preimageHash: '425fb5a483a63cb1038ec53bddb712caa156efbde993c46378056441e089a65e',
-            preimage: '15f253c9140795169c939c524ebf5f66dea1e4b0d0f320cc584c662f602404cb',
+            preimageHash:
+              '425fb5a483a63cb1038ec53bddb712caa156efbde993c46378056441e089a65e',
+            preimage:
+              '15f253c9140795169c939c524ebf5f66dea1e4b0d0f320cc584c662f602404cb',
           },
           {
-            preimageHash: '38eb5c88fe40052cf25223e8842de40e3a62a252067a231a888da5d4436d1676',
-            preimage: '2beff55f5823b6da1ec914572ac9d5ca31a5c6ae88febfe7a160bf90b6a8c4c6',
+            preimageHash:
+              '38eb5c88fe40052cf25223e8842de40e3a62a252067a231a888da5d4436d1676',
+            preimage:
+              '2beff55f5823b6da1ec914572ac9d5ca31a5c6ae88febfe7a160bf90b6a8c4c6',
           },
         ];
 
         for (const swap of claimedErc20Swaps) {
           const [, updated] = await this.sequelize.query(
-            `UPDATE "chainSwaps" SET status = $1, preimage = $2, "updatedAt" = NOW() WHERE "preimageHash" = $3 AND status NOT IN ($4, $5, $6)`,
+            'UPDATE "chainSwaps" SET status = $1, preimage = $2, "updatedAt" = NOW() WHERE "preimageHash" = $3 AND status NOT IN ($4, $5, $6)',
             {
               bind: [
                 SwapUpdateEvent.TransactionClaimed,
@@ -1257,7 +1298,9 @@ class Migration {
           );
 
           if (updated && updated > 0) {
-            this.logger.info(`Marked ERC20 chain swap with preimageHash ${swap.preimageHash} as claimed`);
+            this.logger.info(
+              `Marked ERC20 chain swap with preimageHash ${swap.preimageHash} as claimed`,
+            );
           }
         }
 
@@ -1268,7 +1311,9 @@ class Migration {
       // Delete stale refund_transactions entries for swaps that are already claimed
       // These cause "No such mempool or blockchain transaction" errors in RefundWatcher
       case 26: {
-        this.logger.info('Deleting stale refund_transactions for already-claimed chain swaps');
+        this.logger.info(
+          'Deleting stale refund_transactions for already-claimed chain swaps',
+        );
 
         const staleRefundSwapIds = [
           'KswQeA6ZLIdx',
@@ -1283,36 +1328,33 @@ class Migration {
         ];
 
         await this.sequelize.query(
-          `DELETE FROM refund_transactions WHERE "swapId" = ANY($1::text[])`,
+          'DELETE FROM refund_transactions WHERE "swapId" = ANY($1::text[])',
           {
             bind: [staleRefundSwapIds],
             type: QueryTypes.DELETE,
           },
         );
 
-        this.logger.info(`Deleted stale refund_transactions for ${staleRefundSwapIds.length} chain swaps`);
+        this.logger.info(
+          `Deleted stale refund_transactions for ${staleRefundSwapIds.length} chain swaps`,
+        );
 
         await this.finishMigration(versionRow.version, currencies);
         break;
       }
 
       case 27: {
-        this.logger.info('Marking expired chain swaps as swap.expired and cleaning up stale refund transactions');
+        this.logger.info(
+          'Marking expired chain swaps as swap.expired and cleaning up stale refund transactions',
+        );
 
-        const expiredSwapIds = [
-          'wWq9UFAGAmmW',
-          'CvwGgNneNIn2',
-          'sx4XxmLkAtJJ',
-        ];
+        const expiredSwapIds = ['wWq9UFAGAmmW', 'CvwGgNneNIn2', 'sx4XxmLkAtJJ'];
 
         // Mark swaps as expired
         const [, swapsUpdated] = await this.sequelize.query(
-          `UPDATE "chainSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = ANY($2::text[])`,
+          'UPDATE "chainSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = ANY($2::text[])',
           {
-            bind: [
-              SwapUpdateEvent.SwapExpired,
-              expiredSwapIds,
-            ],
+            bind: [SwapUpdateEvent.SwapExpired, expiredSwapIds],
             type: QueryTypes.UPDATE,
           },
         );
@@ -1320,21 +1362,25 @@ class Migration {
         this.logger.info(`Marked ${swapsUpdated} chain swaps as expired`);
 
         await this.sequelize.query(
-          `DELETE FROM refund_transactions WHERE "swapId" = ANY($1::text[])`,
+          'DELETE FROM refund_transactions WHERE "swapId" = ANY($1::text[])',
           {
             bind: [expiredSwapIds],
             type: QueryTypes.DELETE,
           },
         );
 
-        this.logger.info(`Deleted stale refund_transactions for ${expiredSwapIds.length} expired swaps`);
+        this.logger.info(
+          `Deleted stale refund_transactions for ${expiredSwapIds.length} expired swaps`,
+        );
 
         await this.finishMigration(versionRow.version, currencies);
         break;
       }
 
       case 28: {
-        this.logger.info('Cleaning up stale refund_transactions for already-claimed chain swaps');
+        this.logger.info(
+          'Cleaning up stale refund_transactions for already-claimed chain swaps',
+        );
 
         const claimedSwapIds = [
           'N4X8cwhRoQt3',
@@ -1346,14 +1392,16 @@ class Migration {
         ];
 
         await this.sequelize.query(
-          `DELETE FROM refund_transactions WHERE "swapId" = ANY($1::text[])`,
+          'DELETE FROM refund_transactions WHERE "swapId" = ANY($1::text[])',
           {
             bind: [claimedSwapIds],
             type: QueryTypes.DELETE,
           },
         );
 
-        this.logger.info(`Deleted stale refund_transactions for ${claimedSwapIds.length} already-claimed swaps`);
+        this.logger.info(
+          `Deleted stale refund_transactions for ${claimedSwapIds.length} already-claimed swaps`,
+        );
 
         await this.finishMigration(versionRow.version, currencies);
         break;
@@ -1391,20 +1439,20 @@ class Migration {
 
           await this.sequelize
             .getQueryInterface()
-            .removeIndex(
-              PendingEthereumTransaction.tableName,
-              ['nonce'],
-              { transaction },
-            );
-
-          await this.sequelize.getQueryInterface().addIndex(
-            PendingEthereumTransaction.tableName,
-            ['chainIdentifier', 'nonce'],
-            {
-              unique: true,
+            .removeIndex(PendingEthereumTransaction.tableName, ['nonce'], {
               transaction,
-            },
-          );
+            });
+
+          await this.sequelize
+            .getQueryInterface()
+            .addIndex(
+              PendingEthereumTransaction.tableName,
+              ['chainIdentifier', 'nonce'],
+              {
+                unique: true,
+                transaction,
+              },
+            );
         });
 
         await this.finishMigration(versionRow.version, currencies);
@@ -1436,13 +1484,10 @@ class Migration {
       case 31: {
         this.logger.info('Marking stuck test chain swaps as failed');
 
-        const stuckTestSwapIds = [
-          'FXbxZJE3Mw9Q',
-          'GrIXPeEYYdPQ',
-        ];
+        const stuckTestSwapIds = ['FXbxZJE3Mw9Q', 'GrIXPeEYYdPQ'];
 
         const [, updated] = await this.sequelize.query(
-          `UPDATE "chainSwaps" SET status = $1, "failureReason" = $2, "updatedAt" = NOW() WHERE id = ANY($3::text[])`,
+          'UPDATE "chainSwaps" SET status = $1, "failureReason" = $2, "updatedAt" = NOW() WHERE id = ANY($3::text[])',
           {
             bind: [
               SwapUpdateEvent.TransactionFailed,
@@ -1460,14 +1505,14 @@ class Migration {
       }
 
       case 32: {
-        this.logger.info('Marking chain swaps with dropped lockup transactions as failed');
+        this.logger.info(
+          'Marking chain swaps with dropped lockup transactions as failed',
+        );
 
-        const stuckSwapIds = [
-          'porxbVKRHrK4',
-        ];
+        const stuckSwapIds = ['porxbVKRHrK4'];
 
         const [, updated] = await this.sequelize.query(
-          `UPDATE "chainSwaps" SET status = $1, "failureReason" = $2, "updatedAt" = NOW() WHERE id = ANY($3::text[])`,
+          'UPDATE "chainSwaps" SET status = $1, "failureReason" = $2, "updatedAt" = NOW() WHERE id = ANY($3::text[])',
           {
             bind: [
               SwapUpdateEvent.TransactionFailed,
@@ -1500,7 +1545,7 @@ class Migration {
         ];
 
         const [, updated] = await this.sequelize.query(
-          `UPDATE "chainSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = ANY($2::text[]) AND status NOT IN ($3, $4, $5)`,
+          'UPDATE "chainSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = ANY($2::text[]) AND status NOT IN ($3, $4, $5)',
           {
             bind: [
               SwapUpdateEvent.TransactionClaimed,
@@ -1539,7 +1584,7 @@ class Migration {
         ];
 
         const [, updated] = await this.sequelize.query(
-          `UPDATE "chainSwaps" SET status = $1, "failureReason" = $2, "updatedAt" = NOW() WHERE id = ANY($3::text[]) AND status NOT IN ($4, $5, $6)`,
+          'UPDATE "chainSwaps" SET status = $1, "failureReason" = $2, "updatedAt" = NOW() WHERE id = ANY($3::text[]) AND status NOT IN ($4, $5, $6)',
           {
             bind: [
               SwapUpdateEvent.TransactionFailed,
@@ -1563,7 +1608,7 @@ class Migration {
         this.logger.info('Marking stuck chain swap as claimed');
 
         const [, updated] = await this.sequelize.query(
-          `UPDATE "chainSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = $2 AND status NOT IN ($3, $4, $5)`,
+          'UPDATE "chainSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = $2 AND status NOT IN ($3, $4, $5)',
           {
             bind: [
               SwapUpdateEvent.TransactionClaimed,
@@ -1586,7 +1631,7 @@ class Migration {
         this.logger.info('Marking stuck chain swap qB1peqbE9ZJh as claimed');
 
         const [, updated] = await this.sequelize.query(
-          `UPDATE "chainSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = $2 AND status NOT IN ($3, $4, $5)`,
+          'UPDATE "chainSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = $2 AND status NOT IN ($3, $4, $5)',
           {
             bind: [
               SwapUpdateEvent.TransactionClaimed,
@@ -1616,7 +1661,7 @@ class Migration {
         ];
 
         const [, updatedChain] = await this.sequelize.query(
-          `UPDATE "chainSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = ANY($2::text[]) AND status NOT IN ($3, $4, $5)`,
+          'UPDATE "chainSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = ANY($2::text[]) AND status NOT IN ($3, $4, $5)',
           {
             bind: [
               SwapUpdateEvent.TransactionClaimed,
@@ -1633,13 +1678,10 @@ class Migration {
 
         this.logger.info('Marking stuck reverse swaps as invoice settled');
 
-        const stuckSettledReverseSwapIds = [
-          'nXe2yIeex7ry',
-          '1HhHVhP7Q4W5',
-        ];
+        const stuckSettledReverseSwapIds = ['nXe2yIeex7ry', '1HhHVhP7Q4W5'];
 
         const [, updatedReverse] = await this.sequelize.query(
-          `UPDATE "reverseSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = ANY($2::text[]) AND status NOT IN ($3, $4, $5, $6)`,
+          'UPDATE "reverseSwaps" SET status = $1, "updatedAt" = NOW() WHERE id = ANY($2::text[]) AND status NOT IN ($3, $4, $5, $6)',
           {
             bind: [
               SwapUpdateEvent.InvoiceSettled,
@@ -1653,7 +1695,9 @@ class Migration {
           },
         );
 
-        this.logger.info(`Marked ${updatedReverse} stuck reverse swaps as invoice settled`);
+        this.logger.info(
+          `Marked ${updatedReverse} stuck reverse swaps as invoice settled`,
+        );
 
         await this.finishMigration(versionRow.version, currencies);
         break;

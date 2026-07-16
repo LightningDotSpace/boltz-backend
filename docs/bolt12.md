@@ -49,8 +49,8 @@ Offers for Reverse Swaps can be registered with
 These offers have to include the CLN node of the API endpoint in a blinded
 message path as entry point. Information about the lightning nodes of the API
 can be queried from the
-[`/nodes` endpoint](https://lightning.space/v1/swap/swagger#/Nodes/get_nodes). When
-registering the offer, a webhook URL can be specified. That webhook will be
+[`/nodes` endpoint](https://lightning.space/v1/swap/swagger#/Nodes/get_nodes).
+When registering the offer, a webhook URL can be specified. That webhook will be
 called when an invoice request for the offer is received:
 
 ```json

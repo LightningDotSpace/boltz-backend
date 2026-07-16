@@ -119,7 +119,8 @@ class ContractEventHandler extends TypedEventEmitter<Events> {
         const sustained =
           this.rescanFailureCount >=
           ContractEventHandler.maxTransientRescanFailures;
-        const level = isTransientRpcError(error) && !sustained ? 'warn' : 'error';
+        const level =
+          isTransientRpcError(error) && !sustained ? 'warn' : 'error';
         this.logger[level](
           `Error checking for missed events of ${this.networkDetails.name} contracts v${version} (attempt ${this.rescanFailureCount}), will retry next interval: ${formatError(error)}`,
         );

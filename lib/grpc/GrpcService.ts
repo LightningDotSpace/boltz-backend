@@ -29,7 +29,6 @@ import { LogLevel } from '../proto/boltzrpc_pb';
 import type Service from '../service/Service';
 import Sidecar from '../sidecar/Sidecar';
 
-
 class GrpcService {
   constructor(
     private readonly logger: Logger,

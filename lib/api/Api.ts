@@ -49,16 +49,14 @@ class Api {
     );
 
     // Set header entry for swagger usage
-    this.app.use(
-      (_req: Request, res: Response, next: NextFunction) => {
-        res.setHeader(
-          'Content-Security-Policy',
-          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
-        );
+    this.app.use((_req: Request, res: Response, next: NextFunction) => {
+      res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;",
+      );
 
-        next();
-      },
-    );
+      next();
+    });
 
     this.swapInfos = new SwapInfos(this.logger, service, redis);
     this.controller = new Controller(logger, service, this.swapInfos);

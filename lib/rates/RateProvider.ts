@@ -67,10 +67,7 @@ class RateProvider {
     private readonly walletManager: WalletManager,
     getFeeEstimation: (symbol: string) => Promise<Map<string, number>>,
   ) {
-    this.feeProvider = new FeeProvider(
-      this.logger,
-      getFeeEstimation,
-    );
+    this.feeProvider = new FeeProvider(this.logger, getFeeEstimation);
     this.parseCurrencies(Array.from(currencies.values()));
 
     const minSwapSizeMultipliers = RateProvider.parseMinSwapSizeMultipliers(

@@ -17,6 +17,8 @@ export default [
       'lib/proto',
       'contracts',
       'node_modules',
+      // Vendored swagger-ui bundles, minified and not ours to fix
+      'lib/api/static',
       'docs/.vitepress/dist',
       'docs/.vitepress/cache',
     ],

@@ -29,7 +29,7 @@ import type Sidecar from '../sidecar/Sidecar';
 import type NodeSwitch from '../swap/NodeSwitch';
 import type { Currency } from '../wallet/WalletManager';
 import type EthereumManager from '../wallet/ethereum/EthereumManager';
-import { Ethereum, Rsk, Citrea, Polygon } from '../wallet/ethereum/EvmNetworks';
+import { Citrea, Ethereum, Polygon, Rsk } from '../wallet/ethereum/EvmNetworks';
 import Errors from './Errors';
 import RoutingOffsets from './RoutingOffsets';
 

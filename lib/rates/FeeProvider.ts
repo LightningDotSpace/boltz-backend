@@ -23,7 +23,7 @@ import {
 import type { PairConfig } from '../consts/Types';
 import type Referral from '../db/models/Referral';
 import type { ExtraFees } from '../service/Service';
-import { Ethereum, Rsk, Citrea, Polygon } from '../wallet/ethereum/EvmNetworks';
+import { Citrea, Ethereum, Polygon, Rsk } from '../wallet/ethereum/EvmNetworks';
 
 type TransactionSizesForVersion = {
   normalClaim: number;
