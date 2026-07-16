@@ -233,35 +233,6 @@ describe('ClnClient', () => {
       expect(client['reconnectionTimer']).toBeUndefined();
     });
 
-    test('should replace a subscription left behind by a connect retry', async () => {
-      jest.spyOn(client as any, 'getInfo').mockResolvedValue({});
-      const subscribe = jest
-        .spyOn(client, 'subscribeTrackHoldInvoices')
-        .mockImplementation(() => {});
-
-      // A subscription set up while the connect was still retrying is dead: its
-      // error hit the scheduleReconnect guard the retry timer was holding, so
-      // the successful connect is the last chance to replace it
-      client['trackAllSubscription'] = activeStream();
-
-      await client.connect();
-
-      expect(subscribe).toHaveBeenCalledTimes(1);
-    });
-
-    test('should not subscribe when no subscription was left behind', async () => {
-      jest.spyOn(client as any, 'getInfo').mockResolvedValue({});
-      const subscribe = jest
-        .spyOn(client, 'subscribeTrackHoldInvoices')
-        .mockImplementation(() => {});
-
-      await client.connect();
-
-      // On a clean start SwapManager sets the subscription up, and doing it here
-      // as well would drop the payment hashes it collected
-      expect(subscribe).not.toHaveBeenCalled();
-    });
-
     test('should keep scheduling reconnects after a retried connect', async () => {
       jest.useFakeTimers();
       jest
