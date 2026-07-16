@@ -1,5 +1,5 @@
 import type { ChannelCredentials, ClientReadableStream } from '@grpc/grpc-js';
-import { Metadata, credentials } from '@grpc/grpc-js';
+import { Metadata, credentials, status } from '@grpc/grpc-js';
 import fs from 'fs';
 import BaseClient from '../BaseClient';
 import type Logger from '../Logger';
@@ -162,6 +162,7 @@ class LndClient extends BaseClient<EventTypes> implements LightningClient {
         );
         this.logger.info(`Retrying in ${this.RECONNECT_INTERVAL} ms`);
 
+        this.clearReconnectTimer();
         this.reconnectionTimer = setTimeout(
           this.connect,
           this.RECONNECT_INTERVAL,
@@ -211,6 +212,7 @@ class LndClient extends BaseClient<EventTypes> implements LightningClient {
       );
       this.logger.info(`Retrying in ${this.RECONNECT_INTERVAL} ms`);
 
+      this.clearReconnectTimer();
       this.reconnectionTimer = setTimeout(
         this.reconnect,
         this.RECONNECT_INTERVAL,
@@ -1002,6 +1004,13 @@ class LndClient extends BaseClient<EventTypes> implements LightningClient {
     subscriptionName: string,
     error: any,
   ) => {
+    // Deliberate local cancels (resubscribing or shutting down) would otherwise
+    // trigger a reconnect, which cancels the previous subscriptions again and
+    // feeds itself into an unthrottled reconnect loop
+    if (error?.code === status.CANCELLED) {
+      return;
+    }
+
     this.logger.error(
       `${LndClient.serviceName} ${
         this.symbol

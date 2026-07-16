@@ -1,5 +1,5 @@
 import type { ChannelCredentials, ClientReadableStream } from '@grpc/grpc-js';
-import { Metadata } from '@grpc/grpc-js';
+import { Metadata, status } from '@grpc/grpc-js';
 import BaseClient from '../../BaseClient';
 import type Logger from '../../Logger';
 import { formatError, getHexBuffer, getHexString } from '../../Utils';
@@ -147,6 +147,7 @@ class ClnClient
         );
         this.logger.info(`Retrying in ${this.RECONNECT_INTERVAL} ms`);
 
+        this.clearReconnectTimer();
         this.reconnectionTimer = setTimeout(
           this.connect,
           this.RECONNECT_INTERVAL,
@@ -213,6 +214,7 @@ class ClnClient
       );
       this.logger.info(`Retrying in ${this.RECONNECT_INTERVAL} ms`);
 
+      this.clearReconnectTimer();
       this.reconnectionTimer = setTimeout(
         this.reconnect,
         this.RECONNECT_INTERVAL,
@@ -833,6 +835,13 @@ class ClnClient
     subscriptionName: string,
     error: any,
   ) => {
+    // Deliberate local cancels (resubscribing or shutting down) would otherwise
+    // trigger a reconnect, which cancels the previous subscription again and
+    // feeds itself into a perpetual reconnect loop
+    if (error?.code === status.CANCELLED) {
+      return;
+    }
+
     this.logger.error(
       `${ClnClient.serviceName} ${
         this.symbol
