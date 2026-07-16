@@ -468,7 +468,7 @@ class Sidecar extends BaseClient<
       this.logger.warn(
         `Send swap updates streaming call threw error: ${formatError(err)}`,
       );
-      this.subscribeSwapUpdatesCall = undefined;
+      this.subscribeSendSwapUpdatesCall = undefined;
     });
 
     this.subscribeSendSwapUpdatesCall.on('end', () => {

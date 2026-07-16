@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto';
+import { EventEmitter } from 'events';
 import Logger from '../../../lib/Logger';
 import { getVersion } from '../../../lib/Utils';
 import Sidecar from '../../../lib/sidecar/Sidecar';
@@ -63,6 +64,26 @@ describe('Sidecar', () => {
       const version = '3.8.0-1ec2944b';
 
       expect(Sidecar['trimDirtySuffix'](`${version}-dirty`)).toEqual(version);
+    });
+  });
+
+  describe('subscribeSendSwapUpdates', () => {
+    test('should only clear its own call when the stream errors', () => {
+      const stream = new EventEmitter() as any;
+      stream.cancel = jest.fn();
+
+      const swapUpdatesCall = {} as any;
+      sidecar['subscribeSwapUpdatesCall'] = swapUpdatesCall;
+      sidecar['client'] = { sendSwapUpdate: jest.fn(() => stream) } as any;
+
+      sidecar['subscribeSendSwapUpdates']();
+      stream.emit('error', new Error('streaming call failed'));
+
+      expect(sidecar['subscribeSendSwapUpdatesCall']).toBeUndefined();
+
+      // Clearing this one instead would silently drop every swap update and
+      // web hook, because the swap.update handler returns early on undefined
+      expect(sidecar['subscribeSwapUpdatesCall']).toEqual(swapUpdatesCall);
     });
   });
 });
