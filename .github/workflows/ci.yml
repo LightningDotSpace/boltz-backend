@@ -6,6 +6,9 @@ on:
     branches: [develop, main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   typescript:
     name: TypeScript
@@ -45,8 +48,11 @@ jobs:
       - name: Unit tests
         run: npm run test:unit -- -w 2
 
+  # No cargo test here: the suites reach for bitcoind on 127.0.0.1:18443, so
+  # they need regtest and fail without it (boltz-core 106, boltzr 97). They are
+  # blocked on the same version catch-up as the integration tests, see #117.
   rust:
-    name: Rust
+    name: Rust (build & lint)
     timeout-minutes: 60
     runs-on: ubuntu-latest
 

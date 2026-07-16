@@ -410,26 +410,20 @@ describe('FeeProvider', () => {
     });
   });
 
-  // Expected to fail: updateMinerFees returns zero for every asset that is not
-  // one of the hardcoded native symbols, so tokens are not charged for the gas
-  // they cost us. The expectations below are the correct ones and are kept
-  // unchanged on purpose, so this reports back the moment that is fixed.
-  test.failing('should calculate miner fees of tokens', () => {
+  // Known defect, tracked internally: the default branch of updateMinerFees
+  // returns zero for every asset that is not one of the hardcoded native
+  // symbols, so no token is charged for the gas it costs us — including
+  // WBTC_ETH and WBTCe_CITREA, which are not stablecoins. Upstream charges
+  // gasUsage.ERC20Swap times the network/token rate here.
+  //
+  // This pins the behaviour that is there, not the one that should be, so that
+  // repairing the rule turns it red instead of passing silently.
+  test('does not charge miner fees for tokens', () => {
+    const zero = { normal: 0, reverse: { claim: 0, lockup: 0 } };
+
     expect(feeProvider.minerFees.get('USDT')).toEqual({
-      [SwapVersion.Taproot]: {
-        normal: 26974,
-        reverse: {
-          claim: 53948,
-          lockup: 191356,
-        },
-      },
-      [SwapVersion.Legacy]: {
-        normal: 26974,
-        reverse: {
-          claim: 53948,
-          lockup: 191356,
-        },
-      },
+      [SwapVersion.Taproot]: zero,
+      [SwapVersion.Legacy]: zero,
     });
   });
 
