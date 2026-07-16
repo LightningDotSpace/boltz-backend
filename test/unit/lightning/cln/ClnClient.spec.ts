@@ -4,6 +4,7 @@ import { EventEmitter } from 'events';
 import Logger from '../../../../lib/Logger';
 import { ClientStatus } from '../../../../lib/consts/Enums';
 import ClnClient from '../../../../lib/lightning/cln/ClnClient';
+import type * as holdrpc from '../../../../lib/proto/hold/hold_pb';
 
 // Reading and parsing the TLS certificates is environment setup, not part of
 // the reconnect behaviour under test
@@ -16,7 +17,7 @@ describe('ClnClient', () => {
   let client: ClnClient;
 
   const activeStream = () =>
-    ({}) as unknown as ClientReadableStream<unknown> as any;
+    ({}) as unknown as ClientReadableStream<holdrpc.TrackAllResponse>;
 
   const fakeStream = () => {
     const stream = new EventEmitter() as any;
@@ -230,6 +231,35 @@ describe('ClnClient', () => {
       // A fired handle left behind here would make scheduleReconnect, the only
       // recovery path of this client, a no-op for the rest of the process
       expect(client['reconnectionTimer']).toBeUndefined();
+    });
+
+    test('should replace a subscription left behind by a connect retry', async () => {
+      jest.spyOn(client as any, 'getInfo').mockResolvedValue({});
+      const subscribe = jest
+        .spyOn(client, 'subscribeTrackHoldInvoices')
+        .mockImplementation(() => {});
+
+      // A subscription set up while the connect was still retrying is dead: its
+      // error hit the scheduleReconnect guard the retry timer was holding, so
+      // the successful connect is the last chance to replace it
+      client['trackAllSubscription'] = activeStream();
+
+      await client.connect();
+
+      expect(subscribe).toHaveBeenCalledTimes(1);
+    });
+
+    test('should not subscribe when no subscription was left behind', async () => {
+      jest.spyOn(client as any, 'getInfo').mockResolvedValue({});
+      const subscribe = jest
+        .spyOn(client, 'subscribeTrackHoldInvoices')
+        .mockImplementation(() => {});
+
+      await client.connect();
+
+      // On a clean start SwapManager sets the subscription up, and doing it here
+      // as well would drop the payment hashes it collected
+      expect(subscribe).not.toHaveBeenCalled();
     });
 
     test('should keep scheduling reconnects after a retried connect', async () => {

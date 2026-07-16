@@ -7,13 +7,13 @@ import path from 'path';
 import Logger from '../../../lib/Logger';
 import { ClientStatus } from '../../../lib/consts/Enums';
 import LndClient from '../../../lib/lightning/LndClient';
+import type * as lndrpc from '../../../lib/proto/lnd/rpc_pb';
 
 describe('LndClient', () => {
   let certDir: string;
   let client: LndClient;
 
-  const activeStream = () =>
-    ({}) as unknown as ClientReadableStream<unknown> as any;
+  const activeStream = <T>() => ({}) as unknown as ClientReadableStream<T>;
 
   const fakeStream = () => {
     const stream = new EventEmitter() as any;
@@ -56,12 +56,16 @@ describe('LndClient', () => {
 
       // The stream that errored is not the one the client currently holds,
       // which is what resubscribing and disconnecting leave behind
-      client['peerEventSubscription'] = activeStream();
+      client['peerEventSubscription'] = activeStream<lndrpc.PeerEvent>();
 
-      await client['handleSubscriptionError']('peer event', activeStream(), {
-        code: status.CANCELLED,
-        details: 'Cancelled on client',
-      });
+      await client['handleSubscriptionError'](
+        'peer event',
+        activeStream<lndrpc.PeerEvent>(),
+        {
+          code: status.CANCELLED,
+          details: 'Cancelled on client',
+        },
+      );
 
       expect(scheduleReconnect).not.toHaveBeenCalled();
       expect(client.isConnected()).toEqual(true);
@@ -75,7 +79,7 @@ describe('LndClient', () => {
 
       // grpc-js reports a remote peer cancelling an active stream with the same
       // status code as a local cancel, so the code alone must not silence it
-      const subscription = activeStream();
+      const subscription = activeStream<lndrpc.PeerEvent>();
       client['peerEventSubscription'] = subscription;
 
       await client['handleSubscriptionError']('peer event', subscription, {
@@ -96,7 +100,7 @@ describe('LndClient', () => {
         .spyOn(client as any, 'scheduleReconnect')
         .mockImplementation(() => {});
 
-      const subscription = activeStream();
+      const subscription = activeStream<lndrpc.ChannelEventUpdate>();
       client['channelEventSubscription'] = subscription;
 
       await client['handleSubscriptionError']('channel event', subscription, {
@@ -117,7 +121,7 @@ describe('LndClient', () => {
         .mockImplementation(() => {});
 
       const emit = jest.spyOn(client, 'emit');
-      const subscription = activeStream();
+      const subscription = activeStream<lndrpc.PeerEvent>();
       client['peerEventSubscription'] = subscription;
 
       await client['handleSubscriptionError']('peer event', subscription, {
@@ -134,7 +138,7 @@ describe('LndClient', () => {
         .spyOn(client as any, 'scheduleReconnect')
         .mockImplementation(() => {});
 
-      const subscription = activeStream();
+      const subscription = activeStream<lndrpc.ChannelEventUpdate>();
       client['channelEventSubscription'] = subscription;
 
       await client['handleSubscriptionError']('channel event', subscription, {

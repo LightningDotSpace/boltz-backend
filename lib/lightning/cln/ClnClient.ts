@@ -141,6 +141,14 @@ class ClnClient
         // treats any handle as a reconnect in flight. Not clearing it here would
         // turn scheduleReconnect into a permanent no-op after a retried connect.
         this.clearReconnectTimer();
+
+        // A subscription set up while this client was still retrying its connect
+        // is dead: the retry timer was occupying the scheduleReconnect guard when
+        // its error arrived, so nothing else will ever replace it
+        if (this.trackAllSubscription !== undefined) {
+          this.subscribeTrackHoldInvoices();
+        }
+
         this.setClientStatus(ClientStatus.Connected);
       } catch (error) {
         this.setClientStatus(ClientStatus.Disconnected);
