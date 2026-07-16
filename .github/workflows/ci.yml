@@ -30,9 +30,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate proto files
-        run: npm run proto
-
+      # No proto generation: lib/proto is committed and compile:typescript does
+      # not regenerate it either, so the deployed image builds the files that
+      # are in the tree. Generating them here would type check something else
+      # than what ships, and protos.js swallows its errors anyway.
       - name: Type check
         run: npx tsc --noEmit
 
@@ -48,9 +49,11 @@ jobs:
       - name: Unit tests
         run: npm run test:unit -- -w 2
 
-  # No cargo test here: the suites reach for bitcoind on 127.0.0.1:18443, so
-  # they need regtest and fail without it (boltz-core 106, boltzr 97). They are
-  # blocked on the same version catch-up as the integration tests, see #117.
+  # No workspace-wide cargo test: the boltz-core and boltzr suites reach for
+  # bitcoind on 127.0.0.1:18443 and sit in the same test targets as the plain
+  # unit tests, so they cannot be split off (106 and 97 red without regtest).
+  # They are blocked on the same version catch-up as the integration tests,
+  # see #117. boltzr-cli has no such dependency and is tested below.
   rust:
     name: Rust (build & lint)
     timeout-minutes: 60
@@ -96,3 +99,6 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Test
+        run: cargo test -p boltzr-cli
