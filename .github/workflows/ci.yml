@@ -36,16 +36,15 @@ jobs:
       # their sources; grpc_tools_node_protoc comes from node_modules, so the
       # runner uses the version the lockfile pins.
       - name: Proto drift
-        run: npm run proto && git diff --exit-code lib/proto
+        run: npm run proto && git add --intent-to-add -- lib/proto && git diff --exit-code -- lib/proto
 
-      # Part of compile:typescript, and the one part of it that can fail on its
-      # own: swagger-jsdoc runs with failOnErrors over the @openapi blocks, which
-      # tsc cannot see because they are comments
-      - name: Swagger spec
-        run: npm run swagger
-
-      - name: Type check
-        run: npx tsc --noEmit
+      # The command the image builds with, rather than a rebuilt approximation
+      # of it: parseGitCommit, swagger-jsdoc (failOnErrors over the @openapi
+      # blocks, which tsc cannot see because they are comments), tsc with the
+      # declaration emit tsconfig asks for, and postcompile. --noEmit would skip
+      # the emit and with it every diagnostic that only appears while emitting.
+      - name: Compile
+        run: npm run compile:typescript
 
       - name: Type check tests
         run: npm run compile:typescript:test
