@@ -49,5 +49,6 @@ for (const [path, lib, imports] of protoPaths) {
   } catch (e) {
     console.error(`Could not compile protobuf: ${path}`);
     console.log(e);
+    process.exitCode = 1;
   }
 }

@@ -30,10 +30,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # No proto generation: lib/proto is committed and compile:typescript does
-      # not regenerate it either, so the deployed image builds the files that
-      # are in the tree. Generating them here would type check something else
-      # than what ships, and protos.js swallows its errors anyway.
+      # lib/proto is committed and compile:typescript does not regenerate it, so
+      # the deployed image builds the files that are in the tree — those are the
+      # ones the steps below check. Regenerating only proves they still match
+      # their sources; grpc_tools_node_protoc comes from node_modules, so the
+      # runner uses the version the lockfile pins.
+      - name: Proto drift
+        run: npm run proto && git diff --exit-code lib/proto
+
+      # Part of compile:typescript, and the one part of it that can fail on its
+      # own: swagger-jsdoc runs with failOnErrors over the @openapi blocks, which
+      # tsc cannot see because they are comments
+      - name: Swagger spec
+        run: npm run swagger
+
       - name: Type check
         run: npx tsc --noEmit
 
@@ -55,7 +65,7 @@ jobs:
   # They are blocked on the same version catch-up as the integration tests,
   # see #117. boltzr-cli has no such dependency and is tested below.
   rust:
-    name: Rust (build & lint)
+    name: Rust
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -100,5 +110,5 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-      - name: Test
+      - name: Test (boltzr-cli only)
         run: cargo test -p boltzr-cli
