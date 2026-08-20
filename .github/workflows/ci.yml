@@ -30,13 +30,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # lib/proto is committed and compile:typescript does not regenerate it, so
-      # the deployed image builds the files that are in the tree — those are the
-      # ones the steps below check. Regenerating only proves they still match
-      # their sources; grpc_tools_node_protoc comes from node_modules, so the
-      # runner uses the version the lockfile pins.
+      # Wipe lib/proto first so leftover generated files from removed .proto
+      # sources fail the diff. compile:typescript does not regenerate these;
+      # the image builds what is committed. grpc_tools_node_protoc comes from
+      # node_modules, so the runner uses the lockfile-pinned version.
       - name: Proto drift
-        run: npm run proto && git add --intent-to-add -- lib/proto && git diff --exit-code -- lib/proto
+        run: rm -rf lib/proto && npm run proto && git add -A -- lib/proto && git diff --cached --exit-code -- lib/proto
 
       # The command the image builds with, rather than a rebuilt approximation
       # of it: parseGitCommit, swagger-jsdoc (failOnErrors over the @openapi
