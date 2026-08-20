@@ -1,4 +1,4 @@
-import type { ServiceError, sendUnaryData } from '@grpc/grpc-js';
+import { Metadata, type ServiceError, type sendUnaryData } from '@grpc/grpc-js';
 import fs from 'fs';
 import { createServer } from 'net';
 import path from 'path';
@@ -18,15 +18,27 @@ const promisifyCall = <K, T>(
   client: BoltzClient,
   method: keyof BoltzClient,
   params: K,
+  deadlineMs?: number,
 ): Promise<T> => {
   return new Promise((resolve, reject) => {
-    client[method as any](params, (err: ServiceError, response: any) => {
+    const callback = (err: ServiceError, response: any) => {
       if (err) {
         reject(err);
       } else {
         resolve(response);
       }
-    });
+    };
+
+    if (deadlineMs !== undefined) {
+      client[method as any](
+        params,
+        new Metadata(),
+        { deadline: Date.now() + deadlineMs },
+        callback,
+      );
+    } else {
+      client[method as any](params, callback);
+    }
   });
 };
 
@@ -210,6 +222,7 @@ describe('GrpcServer', () => {
         client,
         'getInfo',
         new boltzrpc.GetInfoRequest(),
+        2_000,
       ),
     ).rejects.toEqual(expect.anything());
 
