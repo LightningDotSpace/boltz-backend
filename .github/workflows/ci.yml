@@ -35,7 +35,12 @@ jobs:
       # the image builds what is committed. grpc_tools_node_protoc comes from
       # node_modules, so the runner uses the lockfile-pinned version.
       - name: Proto drift
-        run: rm -rf lib/proto && npm run proto && git add -A -- lib/proto && git diff --cached --exit-code -- lib/proto
+        run: |
+          rm -rf lib/proto
+          mkdir -p lib/proto/hold lib/proto/cln lib/proto/lnd
+          npm run proto
+          git add -A -- lib/proto
+          git diff --cached --exit-code -- lib/proto
 
       # The command the image builds with, rather than a rebuilt approximation
       # of it: parseGitCommit, swagger-jsdoc (failOnErrors over the @openapi
