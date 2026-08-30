@@ -189,6 +189,10 @@ describe('SwapNursery', () => {
       mockClaimer,
       mockChainSwapSigner,
       {} as any,
+      { checkBalance: jest.fn() } as any,
+      undefined,
+      undefined,
+      true,
     );
 
     // Set up private/public properties using property access notation
@@ -431,6 +435,10 @@ describe('SwapNursery', () => {
         mockClaimer,
         mockChainSwapSigner,
         {} as any,
+        { checkBalance: jest.fn() } as any,
+        undefined,
+        undefined,
+        true,
       );
 
       // Set up private/public properties using property access notation

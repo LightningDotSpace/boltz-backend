@@ -186,6 +186,8 @@ type SwapConfig = {
   overpayment?: OverPaymentConfig;
 
   paymentTimeoutMinutes?: number;
+
+  chainSwapAutoRenegotiate: boolean;
 };
 
 type ConfigType = {
@@ -284,6 +286,7 @@ class Config {
         batchClaimInterval: '*/15 * * * *',
         expiryTolerance: 120,
         cltvDelta: 20,
+        chainSwapAutoRenegotiate: true,
       },
 
       api: {
