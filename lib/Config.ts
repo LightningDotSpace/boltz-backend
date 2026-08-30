@@ -122,6 +122,12 @@ type ContractsConfig = {
   erc20Swap: string;
 };
 
+type StablecoinBridgeConfig = {
+  address: string;
+  jusdSymbol: string;
+  usdteSymbol: string;
+};
+
 type EvmConfig = {
   networkName?: string;
   providerEndpoint: string;
@@ -134,6 +140,8 @@ type EvmConfig = {
   contracts: ContractsConfig[];
 
   tokens: TokenConfig[];
+
+  stablecoinBridge?: StablecoinBridgeConfig;
 };
 
 type ApiConfig = {
@@ -543,4 +551,5 @@ export {
   EthProviderServiceConfig,
   MinSwapSizeMultipliersConfig,
   EmailConfig,
+  StablecoinBridgeConfig,
 };

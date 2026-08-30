@@ -23,6 +23,7 @@ import type { NetworkDetails } from './EvmNetworks';
 import InjectedProvider from './InjectedProvider';
 import SequentialSigner from './SequentialSigner';
 import Contracts from './contracts/Contracts';
+import StablecoinBridgeHandler from './contracts/StablecoinBridgeHandler';
 
 type Network = {
   name: string;
@@ -39,6 +40,9 @@ class EthereumManager {
   public readonly networkDetails: NetworkDetails;
 
   public readonly tokenAddresses = new Map<string, string>();
+
+  public stablecoinBridge?: StablecoinBridgeHandler;
+  public stablecoinBridgeUsdteSymbol?: string;
 
   private contracts: Contracts[] = [];
 
@@ -195,6 +199,66 @@ class EthereumManager {
           );
         }
       }
+    }
+
+    // Initialize StablecoinBridge if configured
+    if (this.config.stablecoinBridge) {
+      const bridgeConfig = this.config.stablecoinBridge;
+      this.stablecoinBridge = new StablecoinBridgeHandler(
+        this.logger,
+        bridgeConfig.address,
+      );
+      this.stablecoinBridge.init(this.provider, this.signer);
+      this.stablecoinBridgeUsdteSymbol = bridgeConfig.usdteSymbol;
+
+      // Approve JUSD for the bridge (burn needs JUSD allowance)
+      const jusdWallet = wallets.get(bridgeConfig.jusdSymbol);
+      if (jusdWallet) {
+        const jusdProvider = jusdWallet.walletProvider as ERC20WalletProvider;
+        let nonce = await this.signer.getNonce();
+        if (
+          await this.checkERC20Allowance(
+            jusdProvider,
+            bridgeConfig.address,
+            nonce,
+          )
+        ) {
+          nonce += 1;
+        }
+
+        // Approve USDT.e for the bridge (mint needs USDT.e allowance)
+        const usdteWallet = wallets.get(bridgeConfig.usdteSymbol);
+        if (usdteWallet) {
+          const usdteProvider =
+            usdteWallet.walletProvider as ERC20WalletProvider;
+          if (
+            await this.checkERC20Allowance(
+              usdteProvider,
+              bridgeConfig.address,
+              nonce,
+            )
+          ) {
+            nonce += 1;
+          }
+
+          // Approve USDT.e for the ERC20Swap contracts (lock needs allowance)
+          for (const c of this.contracts) {
+            if (
+              await this.checkERC20Allowance(
+                usdteProvider,
+                await c.erc20Swap.getAddress(),
+                nonce,
+              )
+            ) {
+              nonce += 1;
+            }
+          }
+        }
+      }
+
+      this.logger.info(
+        `StablecoinBridge initialized: ${bridgeConfig.jusdSymbol} <-> ${bridgeConfig.usdteSymbol}`,
+      );
     }
 
     return wallets;
